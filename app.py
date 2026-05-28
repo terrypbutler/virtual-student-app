@@ -7,7 +7,7 @@ st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
 
 # 🔒 SECURITY CONTROL: Add the exact names of any columns you want hidden from trainees
-COLUMNS_TO_HIDE = ["picture", "Notes", "InternalID", "Admin_Flags"] 
+COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
 @st.cache_data(ttl=10)
 def load_data():
