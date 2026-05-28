@@ -104,7 +104,7 @@ try:
         if st.button("Year 9 Full Report", use_container_width=True):
             st.session_state.active_report = "y9_full"
 
-st.write("---")
+    st.write("---")
 
     # --- FULL WIDTH REPORT RENDERING ---
 
@@ -129,10 +129,9 @@ st.write("---")
                 else:
                     st.markdown(f"### **Transition Passport: {s_name}**")
                 
-                # ✨ STRUCTURAL FIX: Direct, explicit layout blocks instead of automatic loops
                 info_col1, info_col2 = st.columns(2)
                 
-                # Top Core Block Components
+                # Core Balanced Grid Layout
                 if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
                 if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
                 if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
@@ -140,20 +139,17 @@ st.write("---")
                 if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
                 if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
                 if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
-                
-                # Dynamic check for other CAT scores that might be in your dataset rows
                 if "CAT Verbal" in row: info_col2.markdown(f"**CAT Verbal:** {row['CAT Verbal']}")
                 elif "SAT's Maths" in row: info_col2.markdown(f"**SAT's Maths:** {row['SAT's Maths']}")
                 
-                # 🛠️ BREAK LINE & INJECT WHITESPACE UNDER SEND
+                # Whitespace line-break spacer under SEND detail
                 st.write("") 
                 
-                # 🛠️ PLACE ETHNICITY DOWN ON ITS OWN DEDICATED LINE
+                # Ethnicity baseline placement
                 if "Ethnicity" in row:
                     st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
                     
-                # Catch-all container loop for any leftover descriptive text columns in your sheet 
-                # (Skipping fields we already drew manually above)
+                # Loop out any trailing miscellaneous notes columns left over in the background
                 handled_cols = [NAME_COLUMN, DOB_COLUMN, "Gender", "Premium", "EAL", "Key Stage 2", "Reading Age", "CAT Quantitative", "SEND detail", "Ethnicity", "CAT Verbal", "SAT's Maths"]
                 leftover_cols = [c for c in cols_to_keep if c not in handled_cols]
                 
@@ -172,18 +168,38 @@ st.write("---")
         
         for index, row in filtered_df.iterrows():
             box_header = get_header_title(row, "Academic Progress Report")
+            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+            s_dob = str(row.get(DOB_COLUMN, "")).strip()
+            
             with st.expander(f"📊 {box_header}"):
+                if s_dob:
+                    st.markdown(f"### **Academic Progress Report: {s_name} ({s_dob})**")
+                else:
+                    st.markdown(f"### **Academic Progress Report: {s_name}**")
                 
-                m1, m2 = st.columns(2)
-                m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
-                m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
+                # Top Background Profile Block (Mirrors passport styling perfectly)
+                info_col1, info_col2 = st.columns(2)
+                if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
+                if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
+                if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
+                if "Key Stage 2" in row: info_col2.markdown(f"**Key Stage 2:** {row['Key Stage 2']}")
+                if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
+                if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
+                if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
+                if "Current Grade" in row: info_col2.markdown(f"**Current Grade:** {row['Current Grade']}")
+                elif "Target Grade" in row: info_col2.markdown(f"**Target Grade:** {row['Target Grade']}")
+                
+                st.write("") 
+                if "Ethnicity" in row:
+                    st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
+                
                 st.write("---")
-                
                 st.markdown("#### **📚 Subject Performance Breakdown**")
+                
                 subject_data = {}
                 for col in filtered_df.columns:
                     if any(term in col.lower() for term in ["subject", "grade", "score"]):
-                        if not any(term in col.lower() for term in ["target", "current", "set", "maths"]):
+                        if not any(term in col.lower() for term in ["target", "current", "set", "maths", "cutoff"]):
                             subject_data[col] = [row[col]]
                 
                 if subject_data:
