@@ -104,7 +104,7 @@ try:
         if st.button("Year 9 Full Report", use_container_width=True):
             st.session_state.active_report = "y9_full"
 
-    st.write("---")
+st.write("---")
 
     # --- FULL WIDTH REPORT RENDERING ---
 
@@ -124,20 +124,47 @@ try:
             s_dob = str(row.get(DOB_COLUMN, "")).strip()
             
             with st.expander(f"👤 {box_header}"):
-                # ✨ FIXED: Inner passport heading now includes DoB side-by-side
                 if s_dob:
                     st.markdown(f"### **Transition Passport: {s_name} ({s_dob})**")
                 else:
                     st.markdown(f"### **Transition Passport: {s_name}**")
                 
+                # ✨ STRUCTURAL FIX: Direct, explicit layout blocks instead of automatic loops
                 info_col1, info_col2 = st.columns(2)
-                display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, DOB_COLUMN]]
                 
-                for i, col in enumerate(display_cols):
-                    if i % 2 == 0:
-                        info_col1.markdown(f"**{col}:** {row[col]}")
-                    else:
-                        info_col2.markdown(f"**{col}:** {row[col]}")
+                # Top Core Block Components
+                if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
+                if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
+                if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
+                if "Key Stage 2" in row: info_col2.markdown(f"**Key Stage 2:** {row['Key Stage 2']}")
+                if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
+                if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
+                if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
+                
+                # Dynamic check for other CAT scores that might be in your dataset rows
+                if "CAT Verbal" in row: info_col2.markdown(f"**CAT Verbal:** {row['CAT Verbal']}")
+                elif "SAT's Maths" in row: info_col2.markdown(f"**SAT's Maths:** {row['SAT's Maths']}")
+                
+                # 🛠️ BREAK LINE & INJECT WHITESPACE UNDER SEND
+                st.write("") 
+                
+                # 🛠️ PLACE ETHNICITY DOWN ON ITS OWN DEDICATED LINE
+                if "Ethnicity" in row:
+                    st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
+                    
+                # Catch-all container loop for any leftover descriptive text columns in your sheet 
+                # (Skipping fields we already drew manually above)
+                handled_cols = [NAME_COLUMN, DOB_COLUMN, "Gender", "Premium", "EAL", "Key Stage 2", "Reading Age", "CAT Quantitative", "SEND detail", "Ethnicity", "CAT Verbal", "SAT's Maths"]
+                leftover_cols = [c for c in cols_to_keep if c not in handled_cols]
+                
+                if leftover_cols:
+                    st.write("---")
+                    left_col, right_col = st.columns(2)
+                    for i, col in enumerate(leftover_cols):
+                        if i % 2 == 0:
+                            left_col.markdown(f"**{col}:** {row[col]}")
+                        else:
+                            right_col.markdown(f"**{col}:** {row[col]}")
 
     # 2. YEAR 7 SUBJECT REPORT
     elif st.session_state.active_report == "y7_subject":
@@ -166,7 +193,7 @@ try:
                 else:
                     st.caption("*No supplementary internal school subject columns found in database.*")
 
-   # 3. YEAR 9 TRANSITION REPORT
+    # 3. YEAR 9 TRANSITION REPORT
     elif st.session_state.active_report == "y9_transition":
         st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
         restricted_terms = ["projected", "target", "subject", "report", "grade"]
