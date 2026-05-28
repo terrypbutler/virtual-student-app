@@ -6,7 +6,7 @@ st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 # Your live Google Sheets CSV data feed link
 DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
 
-# 🔒 SECURITY CONTROL: Automatically hidden from all dataframes, tables, and reports
+# 🔒 SECURITY CONTROL: Hidden from all dataframes, tables, and reports
 COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
 @st.cache_data(ttl=10)
@@ -18,6 +18,9 @@ def load_data():
     cols_to_drop = [col for col in COLUMNS_TO_HIDE if col in data.columns]
     if cols_to_drop:
         data = data.drop(columns=cols_to_drop)
+        
+    # ✨ FORMATTING FIX: Replace all blank/empty spreadsheet cells (NaN) with clean spaces
+    data = data.fillna("")
     return data
 
 try:
@@ -40,9 +43,11 @@ try:
         filtered_df = df
         view_label = "All Cohorts"
 
-    # Display Clean Live Table View
-    st.subheader(f"Class Roster Matrix: {view_label}")
-    st.dataframe(filtered_df, use_container_width=True)
+    # 🔍 OPTIONAL RAW DATA VIEW (Hidden behind a toggle button to keep layout clean)
+    st.write("")
+    if st.checkbox("🔍 View Raw Class Dataset Matrix"):
+        st.subheader(f"Raw Data Grid: {view_label}")
+        st.dataframe(filtered_df, use_container_width=True)
     st.write("---")
 
     # Report & Passport Processing Interface
@@ -104,7 +109,7 @@ try:
                     else:
                         st.caption("*No supplementary internal school subject columns found in database.*")
 
-    # --- BUTTON 3: YEAR 9 TRANSITION REPORT (No Projected Data/Subject Reports) ---
+    # --- BUTTON 3: YEAR 9 TRANSITION REPORT ---
     with col3:
         if st.button("Year 9 Transition Report", use_container_width=True):
             st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
@@ -125,7 +130,7 @@ try:
                         else:
                             info_col2.markdown(f"🔹 **{col}:** {row[col]}")
 
-    # --- BUTTON 4: YEAR 9 FULL REPORT (Complete Holistic Overview) ---
+    # --- BUTTON 4: YEAR 9 FULL REPORT ---
     with col4:
         if st.button("Year 9 Full Report", use_container_width=True):
             st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
