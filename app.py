@@ -26,8 +26,8 @@ def load_data(url):
     data = data.fillna("")
     return data
 
-# Helper function to find, crop, and display the left half of a student photo
-def display_student_photo(student_name):
+# ✨ UPDATED: Now trims the top/bottom and displays larger
+def display_student_photo(student_name, cohort):
     safe_name = str(student_name).strip().replace(".", "")
     folder_path = "photos" 
 
@@ -47,9 +47,25 @@ def display_student_photo(student_name):
             try:
                 img = Image.open(image_path)
                 width, height = img.size
-                left_half_box = (0, 0, width // 2, height)
-                cropped_img = img.crop(left_half_box)
-                st.image(cropped_img, width=150)
+                
+                # ✨ NEW: Calculate the top and bottom trim (Currently set to shave off 15%)
+                # Change 0.15 to 0.10 if it cuts off too much, or 0.20 to zoom in more
+                trim_amount = int(height * 0.15) 
+                top_edge = trim_amount
+                bottom_edge = height - trim_amount
+                
+                # Dynamic Cropping Logic with top/bottom trims applied
+                if cohort == "Year 9":
+                    # Crop right half + trim height
+                    crop_box = (width // 2, top_edge, width, bottom_edge)
+                else:
+                    # Crop left half + trim height
+                    crop_box = (0, top_edge, width // 2, bottom_edge)
+                
+                cropped_img = img.crop(crop_box)
+                
+                # ✨ NEW: Bumped display width up from 150 to 220
+                st.image(cropped_img, width=220)
             except Exception as e:
                 st.caption("*(File is corrupted or not a valid image)*")
         else:
@@ -90,7 +106,7 @@ try:
                 return str(row_data[col])
         return "N/A"
 
-    # ✨ NEW: View Type Toggle Switch
+    # View Type Toggle Switch
     view_type = st.radio("🔍 Group View By:", ["Maths Set", "Tutor Group"], horizontal=True)
 
     # Determine the target database column dynamically based on selection
@@ -193,7 +209,7 @@ try:
                         st.markdown(f"### **{s_name}**")
                         
                 with photo_col:
-                    display_student_photo(s_name)
+                    display_student_photo(s_name, selected_cohort)
                 
                 form_keys = ["Form Tutor", "Tutor", "Form Group"]
                 gender_keys = ["Gender"]
@@ -272,9 +288,8 @@ try:
                         st.markdown(f"### **Academic Progress Report: {s_name}**")
                         
                 with photo_col:
-                    display_student_photo(s_name)
+                    display_student_photo(s_name, selected_cohort)
                 
-                # Current/Target Metrics
                 m1, m2 = st.columns(2)
                 m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
@@ -360,7 +375,7 @@ try:
                 with title_col:
                     st.markdown(f"### **Key Transition Profile: {s_name}**")
                 with photo_col:
-                    display_student_photo(s_name)
+                    display_student_photo(s_name, selected_cohort)
                     
                 st.write("---")
                 
@@ -385,7 +400,7 @@ try:
                 with title_col:
                     st.markdown(f"### **Full Holistic Record: {s_name}**")
                 with photo_col:
-                    display_student_photo(s_name)
+                    display_student_photo(s_name, selected_cohort)
                     
                 st.write("---")
                 
