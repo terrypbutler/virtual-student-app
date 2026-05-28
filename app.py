@@ -31,7 +31,7 @@ try:
     st.write("---")
 
     TARGET_COLUMN = "Maths Set"
-    NAME_COLUMN = "Full Name"  # ✨ Explicitly targeting your exact column header
+    NAME_COLUMN = "Full Name" 
 
     # Class Set Filter Setup
     if TARGET_COLUMN in df.columns:
@@ -87,4 +87,15 @@ try:
         st.markdown(f"### 📄 Year 7 Passports — {view_label}")
         cols_to_keep = [col for col in filtered_df.columns if "subject" not in col.lower() and "report" not in col.lower()]
         
-        for index, row in filtered_df[cols_to_keep].iterrows
+        # Fixed looping syntax here ()
+        for index, row in filtered_df[cols_to_keep].iterrows():
+            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+            with st.expander(f"👤 {s_name.upper()} — Year 7 Passport"):
+                
+                m1, m2 = st.columns(2)
+                m1.metric("KS2 Score Reference", row.get('Key Stage 2', 'N/A'))
+                m2.metric("Reading Age Entry", row.get('Reading Age', 'N/A'))
+                st.write("---")
+                
+                info_col1, info_col2 = st.columns(2)
+                for i, col in enumerate(
