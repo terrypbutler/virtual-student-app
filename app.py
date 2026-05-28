@@ -3,18 +3,19 @@ import pandas as pd
 
 st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 
-# Paste your exact Marjon SharePoint download link between the quotation marks below:
-EXCEL_LIVE_URL = "https://marjonuni-my.sharepoint.com/personal/tbutler_marjon_ac_uk/_layouts/15/Doc.aspx?sourcedoc={7487ddfe-bc4b-466c-b937-05c8edbcb9c4}&download=1"
+# Your personal OneDrive link converted to a direct data stream
+EXCEL_LIVE_URL = "https://1drv.ms/x/c/4e58796b40951c18/IQQQ019JbjbJTpN5nkOfl2hZATe8W6mRfUzc1KldB8qTCRw?download=1"
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=10) # Refreshes very quickly (every 10 seconds) for easy testing
 def load_data():
+    # Reads the live OneDrive Excel file directly into Python
     return pd.read_excel(EXCEL_LIVE_URL)
 
 try:
     df = load_data()
     
     st.title("🎓 Virtual Student Intake Dashboard")
-    st.caption("Live simulation data pulling securely from your Marjon SharePoint. Edits made in Excel update here.")
+    st.caption("Live simulation data pulling securely from OneDrive. Edits made in Excel update here.")
     st.write("---")
 
     # Class Set Filter
@@ -24,7 +25,7 @@ try:
         selected_set = st.selectbox("🎯 Select Academic Set View:", available_sets)
         filtered_df = df[df['Set'] == selected_set]
     else:
-        st.warning("Could not find a 'Set' column in your Excel sheet. Verify your column headers.")
+        st.warning("Could not find a 'Set' column in your Excel sheet. Make sure you have a column named exactly 'Set' (case-sensitive).")
         filtered_df = df
 
     # Display Class Data Table
