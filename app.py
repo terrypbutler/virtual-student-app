@@ -140,7 +140,9 @@ try:
                 if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
                 if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
                 if "CAT Verbal" in row: info_col2.markdown(f"**CAT Verbal:** {row['CAT Verbal']}")
-                elif "SAT's Maths" in row: info_col2.markdown(f"**SAT's Maths:** {row['SAT's Maths']}")
+                
+                # ✨ FIXED: Using string addition avoids the quote clash entirely
+                elif "SAT's Maths" in row: info_col2.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
                 
                 # Whitespace line-break spacer under SEND detail
                 st.write("") 
