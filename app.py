@@ -6,7 +6,7 @@ st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 # Your live Google Sheets CSV data feed link
 DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
 
-# 🔒 SECURITY CONTROL: Add the exact names of any columns you want hidden from trainees
+# 🔒 SECURITY CONTROL: Automatically hidden from all dataframes, tables, and reports
 COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
 @st.cache_data(ttl=10)
@@ -51,29 +51,31 @@ try:
 
     col1, col2, col3, col4 = st.columns(4)
 
-    # --- BUTTON 1: YEAR 7 TRANSITION PASSPORT ---
+    # --- BUTTON 1: YEAR 7 TRANSITION PASSPORT (No Subject Data) ---
     with col1:
         if st.button("Year 7 Transition Passport", use_container_width=True):
             st.markdown(f"### 📄 Year 7 Passports — {view_label}")
-            # Strip out subject reports explicitly
             cols_to_keep = [col for col in filtered_df.columns if "subject" not in col.lower() and "report" not in col.lower()]
             
             for index, row in filtered_df[cols_to_keep].iterrows():
                 with st.expander(f"👤 Passport: {row.get('Name', 'Unknown Student')}"):
-                    # Professional structural formatting
-                    st.markdown(f"#### **Student Profile: {row.get('Name')}**")
+                    st.markdown(f"### **Transition Passport: {row.get('Name')}**")
                     
-                    # Layout key metrics in clean columns inside the card
+                    # Core Baseline Layout Metric Boxes
                     m1, m2 = st.columns(2)
-                    if 'Key Stage 2' in row: m1.metric("KS2 Score", row['Key Stage 2'])
-                    if 'Reading Age' in row: m2.metric("Reading Age", row['Reading Age'])
-                    
+                    m1.metric("KS2 Score Reference", row.get('Key Stage 2', 'N/A'))
+                    m2.metric("Reading Age Entry", row.get('Reading Age', 'N/A'))
                     st.write("---")
-                    for col in cols_to_keep:
-                        if col not in ['Name', 'Key Stage 2', 'Reading Age']:
-                            st.write(f"**{col}:** {row[col]}")
+                    
+                    # Two-column layout for remaining student attributes
+                    info_col1, info_col2 = st.columns(2)
+                    for i, col in enumerate([c for c in cols_to_keep if c not in ['Name', 'Key Stage 2', 'Reading Age']]):
+                        if i % 2 == 0:
+                            info_col1.markdown(f"**{col}:** {row[col]}")
+                        else:
+                            info_col2.markdown(f"**{col}:** {row[col]}")
 
-    # --- BUTTON 2: YEAR 7 SUBJECT REPORT ---
+    # --- BUTTON 2: YEAR 7 SUBJECT REPORT (With Progress Breakdown Table) ---
     with col2:
         if st.button("Year 7 Subject Report", use_container_width=True):
             st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
@@ -82,10 +84,11 @@ try:
                 with st.expander(f"📊 Full Report: {row.get('Name', 'Unknown Student')}"):
                     st.markdown(f"### **Academic Progress Report: {row.get('Name')}**")
                     
-                    # Highlight Target vs Current grades if columns exist
+                    # Structural Layout for Current Performance Metrics
                     m1, m2 = st.columns(2)
-                    if 'Current Grade' in row: m1.metric("Current Performance", row['Current Grade'])
-                    if 'Target Grade' in row: m2.metric("Target Expectation", row['Target Grade'])
+                    m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
+                    m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
+                    st.write("---")
                     
                     st.markdown("#### **📚 Subject Performance Breakdown**")
                     subject_data = {}
@@ -95,14 +98,13 @@ try:
                                 subject_data[col] = [row[col]]
                     
                     if subject_data:
-                        # Turn row scores into a sleek, clean summary table
                         summary_table = pd.DataFrame(subject_data).T
-                        summary_table.columns = ["Assigned Level / Feedback"]
+                        summary_table.columns = ["Assigned Level / Progress Tracker"]
                         st.table(summary_table)
                     else:
-                        st.write("*No supplementary subject columns found.*")
+                        st.caption("*No supplementary internal school subject columns found in database.*")
 
-    # --- BUTTON 3: YEAR 9 TRANSITION REPORT ---
+    # --- BUTTON 3: YEAR 9 TRANSITION REPORT (No Projected Data/Subject Reports) ---
     with col3:
         if st.button("Year 9 Transition Report", use_container_width=True):
             st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
@@ -111,26 +113,40 @@ try:
             
             for index, row in filtered_df[cols_to_keep].iterrows():
                 with st.expander(f"📁 Transition Record: {row.get('Name', 'Unknown Student')}"):
-                    st.markdown(f"#### **Key Transition Background: {row.get('Name')}**")
-                    st.write(f"**Assigned Placement:** Set {row.get(TARGET_COLUMN)}")
+                    st.markdown(f"### **Key Transition Profile: {row.get('Name')}**")
+                    st.markdown(f"**Assigned Placement:** `Set {row.get(TARGET_COLUMN)}`")
                     st.write("---")
-                    for col in cols_to_keep:
-                        if col not in ['Name', TARGET_COLUMN]:
-                            st.write(f"**{col}:** {row[col]}")
+                    
+                    info_col1, info_col2 = st.columns(2)
+                    display_cols = [col for col in cols_to_keep if col not in ['Name', TARGET_COLUMN]]
+                    for i, col in enumerate(display_cols):
+                        if i % 2 == 0:
+                            info_col1.markdown(f"🔹 **{col}:** {row[col]}")
+                        else:
+                            info_col2.markdown(f"🔹 **{col}:** {row[col]}")
 
-    # --- BUTTON 4: YEAR 9 FULL REPORT ---
+    # --- BUTTON 4: YEAR 9 FULL REPORT (Complete Holistic Overview) ---
     with col4:
         if st.button("Year 9 Full Report", use_container_width=True):
             st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
             
             for index, row in filtered_df.iterrows():
                 with st.expander(f"🎓 Complete Record: {row.get('Name', 'Unknown Student')}"):
-                    st.markdown(f"### **Complete Holistic Overview: {row.get('Name')}**")
+                    st.markdown(f"### **Holistic Pupil Performance Summary: {row.get('Name')}**")
+                    st.write("---")
                     
-                    # Dynamic presentation metrics layout
-                    for col in filtered_df.columns:
-                        if col != 'Name':
-                            st.markdown(f"👉 **{col}:** {row[col]}")
+                    # Present data cleanly across three columns for a balanced overview
+                    c1, c2, c3 = st.columns(3)
+                    all_cols = [col for col in filtered_df.columns if col != 'Name']
+                    
+                    for i, col in enumerate(all_cols):
+                        content_string = f"📌 **{col}:** {row[col]}"
+                        if i % 3 == 0:
+                            c1.markdown(content_string)
+                        elif i % 3 == 1:
+                            c2.markdown(content_string)
+                        else:
+                            c3.markdown(content_string)
 
 except Exception as e:
     st.error("Error running application layout logic. Verify spreadsheet column titles.")
