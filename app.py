@@ -33,7 +33,7 @@ try:
     TARGET_COLUMN = "Maths Set"
     NAME_COLUMN = "Full Name" 
     CUTOFF_COLUMN = "SAT's Maths"  
-    DOB_COLUMN = "DoB"  # Locked onto your exact header: DoB
+    DOB_COLUMN = "DoB"  
 
     # Helper function to generate uniform headers with Name and DOB side-by-side
     def get_header_title(row_data, report_label):
@@ -43,11 +43,12 @@ try:
             return f"{s_name} ({s_dob}) — {report_label}"
         return f"{s_name} — {report_label}"
 
-    # Helper function to safely grab data for the strict HTML table mapping
+    # ✨ FIXED: This helper is now CASE-INSENSITIVE so capital letters won't break the layout!
     def get_val(row_data, keys):
-        for k in keys:
-            if k in row_data.index and str(row_data[k]).strip() != "":
-                return str(row_data[k])
+        keys_lower = [k.lower() for k in keys]
+        for col in row_data.index:
+            if col.lower() in keys_lower and str(row_data[col]).strip() != "":
+                return str(row_data[col])
         return "N/A"
 
     # Class Set Filter Setup
@@ -96,7 +97,6 @@ try:
     if 'active_report' not in st.session_state:
         st.session_state.active_report = None
 
-    # Draw the 4 buttons side-by-side in narrow columns
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         if st.button("Year 7 Transition Passport", use_container_width=True):
@@ -131,13 +131,12 @@ try:
             s_dob = str(row.get(DOB_COLUMN, "")).strip()
             
             with st.expander(f"👤 {box_header}"):
-                # Top Headers stay exactly where they are
                 if s_dob:
                     st.markdown(f"### **{s_name} ({s_dob})**")
                 else:
                     st.markdown(f"### **{s_name}**")
                 
-                # ✨ NEW HTML MULTI-CELL TABLE
+                # Dynamic Table Data Grabs
                 form_val = get_val(row, ["Form Tutor", "Tutor", "Form Group"])
                 gender_val = get_val(row, ["Gender"])
                 sen_status_val = get_val(row, ["SEN Status", "SEND Status"])
@@ -148,6 +147,7 @@ try:
                 read_val = get_val(row, ["SAT's Reading", "Reading Score", "Reading Age"])
                 math_val = get_val(row, ["SAT's Maths", "Maths Score"])
 
+                # ✨ UPDATED HTML MULTI-CELL TABLE
                 table_html = f"""
                 <table style="width:100%; text-align:left; border: 1px solid #ddd; border-collapse: collapse; margin-bottom: 15px; background-color: white;">
                     <tr>
@@ -163,20 +163,21 @@ try:
                         <td style="border: 1px solid #ddd; padding: 10px;"><strong>EAL Status:</strong> {eal_val}</td>
                     </tr>
                     <tr>
-                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged:</strong> {dis_val}</td>
+                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged (PP):</strong> {dis_val}</td>
                     </tr>
                     <tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Reading:</strong> {read_val}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Maths:</strong> {math_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SATs Reading:</strong> {read_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SATs Maths:</strong> {math_val}</td>
                     </tr>
                 </table>
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
                     
                 # Loop out any trailing miscellaneous notes columns left over in the background
+                # This filter is now case-insensitive so "SEND Detail" won't leak through!
                 handled_keys = ["Form Tutor", "Tutor", "Form Group", "Gender", "SEN Status", "SEND Status", "SEND detail", "SEN detail", "Ethnicity", "EAL", "EAL Status", "Premium", "Disadvantaged", "Pupil Premium", "SAT's Reading", "Reading Score", "Reading Age", "SAT's Maths", "Maths Score"]
-                handled_cols = [NAME_COLUMN, DOB_COLUMN] + handled_keys
-                leftover_cols = [c for c in cols_to_keep if c not in handled_cols]
+                handled_cols_lower = [NAME_COLUMN.lower(), DOB_COLUMN.lower()] + [k.lower() for k in handled_keys]
+                leftover_cols = [c for c in cols_to_keep if c.lower() not in handled_cols_lower]
                 
                 if leftover_cols:
                     left_col, right_col = st.columns(2)
@@ -207,7 +208,6 @@ try:
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
                 st.write("---")
                 
-                # ✨ NEW HTML MULTI-CELL TABLE (Mirrors Passport Profile exactly)
                 form_val = get_val(row, ["Form Tutor", "Tutor", "Form Group"])
                 gender_val = get_val(row, ["Gender"])
                 sen_status_val = get_val(row, ["SEN Status", "SEND Status"])
@@ -233,11 +233,11 @@ try:
                         <td style="border: 1px solid #ddd; padding: 10px;"><strong>EAL Status:</strong> {eal_val}</td>
                     </tr>
                     <tr>
-                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged:</strong> {dis_val}</td>
+                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged (PP):</strong> {dis_val}</td>
                     </tr>
                     <tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Reading:</strong> {read_val}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Maths:</strong> {math_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SATs Reading:</strong> {read_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SATs Maths:</strong> {math_val}</td>
                     </tr>
                 </table>
                 """
@@ -249,7 +249,7 @@ try:
                 subject_data = {}
                 for col in filtered_df.columns:
                     if any(term in col.lower() for term in ["subject", "grade", "score"]):
-                        if not any(term in col.lower() for term in ["target", "current", "set", "maths", "cutoff"]):
+                        if not any(term in col.lower() for term in ["target", "current", "set", "maths", "cutoff", "reading"]):
                             subject_data[col] = [row[col]]
                 
                 if subject_data:
