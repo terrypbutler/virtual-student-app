@@ -43,7 +43,7 @@ try:
             return f"{s_name} ({s_dob}) — {report_label}"
         return f"{s_name} — {report_label}"
 
-    # ✨ FIXED: This helper is now CASE-INSENSITIVE so capital letters won't break the layout!
+    # Helper function (Case-insensitive) to grab data for the table
     def get_val(row_data, keys):
         keys_lower = [k.lower() for k in keys]
         for col in row_data.index:
@@ -136,18 +136,28 @@ try:
                 else:
                     st.markdown(f"### **{s_name}**")
                 
+                # ✨ UNIFIED DATA KEYS: Ensures table items are NEVER duplicated below
+                form_keys = ["Form Tutor", "Tutor", "Form Group"]
+                gender_keys = ["Gender"]
+                sen_status_keys = ["SEN Status", "SEND Status"]
+                sen_detail_keys = ["SEND detail", "SEN detail"]
+                eth_keys = ["Ethnicity"]
+                eal_keys = ["EAL", "EAL Status"]
+                dis_keys = ["Premium", "Disadvantaged", "Pupil Premium", "Disadvantaged (PP)"]
+                read_keys = ["SATs Reading", "SAT's Reading", "Reading Score"]
+                math_keys = ["SATs Maths", "SAT's Maths", "Maths Score"]
+                
                 # Dynamic Table Data Grabs
-                form_val = get_val(row, ["Form Tutor", "Tutor", "Form Group"])
-                gender_val = get_val(row, ["Gender"])
-                sen_status_val = get_val(row, ["SEN Status", "SEND Status"])
-                sen_detail_val = get_val(row, ["SEND detail", "SEN detail"])
-                eth_val = get_val(row, ["Ethnicity"])
-                eal_val = get_val(row, ["EAL", "EAL Status"])
-                dis_val = get_val(row, ["Premium", "Disadvantaged", "Pupil Premium"])
-                read_val = get_val(row, ["SAT's Reading", "Reading Score", "Reading Age"])
-                math_val = get_val(row, ["SAT's Maths", "Maths Score"])
+                form_val = get_val(row, form_keys)
+                gender_val = get_val(row, gender_keys)
+                sen_status_val = get_val(row, sen_status_keys)
+                sen_detail_val = get_val(row, sen_detail_keys)
+                eth_val = get_val(row, eth_keys)
+                eal_val = get_val(row, eal_keys)
+                dis_val = get_val(row, dis_keys)
+                read_val = get_val(row, read_keys)
+                math_val = get_val(row, math_keys)
 
-                # ✨ UPDATED HTML MULTI-CELL TABLE
                 table_html = f"""
                 <table style="width:100%; text-align:left; border: 1px solid #ddd; border-collapse: collapse; margin-bottom: 15px; background-color: white;">
                     <tr>
@@ -173,10 +183,10 @@ try:
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
                     
-                # Loop out any trailing miscellaneous notes columns left over in the background
-                # This filter is now case-insensitive so "SEND Detail" won't leak through!
-                handled_keys = ["Form Tutor", "Tutor", "Form Group", "Gender", "SEN Status", "SEND Status", "SEND detail", "SEN detail", "Ethnicity", "EAL", "EAL Status", "Premium", "Disadvantaged", "Pupil Premium", "SAT's Reading", "Reading Score", "Reading Age", "SAT's Maths", "Maths Score"]
+                # The handled keys are now combined directly, mathematically preventing duplicates
+                handled_keys = form_keys + gender_keys + sen_status_keys + sen_detail_keys + eth_keys + eal_keys + dis_keys + read_keys + math_keys
                 handled_cols_lower = [NAME_COLUMN.lower(), DOB_COLUMN.lower()] + [k.lower() for k in handled_keys]
+                
                 leftover_cols = [c for c in cols_to_keep if c.lower() not in handled_cols_lower]
                 
                 if leftover_cols:
@@ -208,15 +218,26 @@ try:
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
                 st.write("---")
                 
-                form_val = get_val(row, ["Form Tutor", "Tutor", "Form Group"])
-                gender_val = get_val(row, ["Gender"])
-                sen_status_val = get_val(row, ["SEN Status", "SEND Status"])
-                sen_detail_val = get_val(row, ["SEND detail", "SEN detail"])
-                eth_val = get_val(row, ["Ethnicity"])
-                eal_val = get_val(row, ["EAL", "EAL Status"])
-                dis_val = get_val(row, ["Premium", "Disadvantaged", "Pupil Premium"])
-                read_val = get_val(row, ["SAT's Reading", "Reading Score", "Reading Age"])
-                math_val = get_val(row, ["SAT's Maths", "Maths Score"])
+                # ✨ UNIFIED DATA KEYS
+                form_keys = ["Form Tutor", "Tutor", "Form Group"]
+                gender_keys = ["Gender"]
+                sen_status_keys = ["SEN Status", "SEND Status"]
+                sen_detail_keys = ["SEND detail", "SEN detail"]
+                eth_keys = ["Ethnicity"]
+                eal_keys = ["EAL", "EAL Status"]
+                dis_keys = ["Premium", "Disadvantaged", "Pupil Premium", "Disadvantaged (PP)"]
+                read_keys = ["SATs Reading", "SAT's Reading", "Reading Score"]
+                math_keys = ["SATs Maths", "SAT's Maths", "Maths Score"]
+                
+                form_val = get_val(row, form_keys)
+                gender_val = get_val(row, gender_keys)
+                sen_status_val = get_val(row, sen_status_keys)
+                sen_detail_val = get_val(row, sen_detail_keys)
+                eth_val = get_val(row, eth_keys)
+                eal_val = get_val(row, eal_keys)
+                dis_val = get_val(row, dis_keys)
+                read_val = get_val(row, read_keys)
+                math_val = get_val(row, math_keys)
 
                 table_html = f"""
                 <table style="width:100%; text-align:left; border: 1px solid #ddd; border-collapse: collapse; margin-bottom: 15px; background-color: white;">
