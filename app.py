@@ -19,7 +19,7 @@ def load_data():
     if cols_to_drop:
         data = data.drop(columns=cols_to_drop)
         
-    # ✨ FORMATTING FIX: Replace all blank/empty spreadsheet cells (NaN) with clean spaces
+    # Replace all blank/empty spreadsheet cells (NaN) with clean spaces
     data = data.fillna("")
     return data
 
@@ -43,7 +43,7 @@ try:
         filtered_df = df
         view_label = "All Cohorts"
 
-    # 🔍 OPTIONAL RAW DATA VIEW (Hidden behind a toggle button to keep layout clean)
+    # 🔍 OPTIONAL RAW DATA VIEW
     st.write("")
     if st.checkbox("🔍 View Raw Class Dataset Matrix"):
         st.subheader(f"Raw Data Grid: {view_label}")
@@ -66,13 +66,11 @@ try:
                 with st.expander(f"👤 Passport: {row.get('Name', 'Unknown Student')}"):
                     st.markdown(f"### **Transition Passport: {row.get('Name')}**")
                     
-                    # Core Baseline Layout Metric Boxes
                     m1, m2 = st.columns(2)
                     m1.metric("KS2 Score Reference", row.get('Key Stage 2', 'N/A'))
                     m2.metric("Reading Age Entry", row.get('Reading Age', 'N/A'))
                     st.write("---")
                     
-                    # Two-column layout for remaining student attributes
                     info_col1, info_col2 = st.columns(2)
                     for i, col in enumerate([c for c in cols_to_keep if c not in ['Name', 'Key Stage 2', 'Reading Age']]):
                         if i % 2 == 0:
@@ -80,7 +78,7 @@ try:
                         else:
                             info_col2.markdown(f"**{col}:** {row[col]}")
 
-    # --- BUTTON 2: YEAR 7 SUBJECT REPORT (With Progress Breakdown Table) ---
+    # --- BUTTON 2: YEAR 7 SUBJECT REPORT (Widescreen Table Fix) ---
     with col2:
         if st.button("Year 7 Subject Report", use_container_width=True):
             st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
@@ -89,7 +87,6 @@ try:
                 with st.expander(f"📊 Full Report: {row.get('Name', 'Unknown Student')}"):
                     st.markdown(f"### **Academic Progress Report: {row.get('Name')}**")
                     
-                    # Structural Layout for Current Performance Metrics
                     m1, m2 = st.columns(2)
                     m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
                     m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
@@ -105,7 +102,9 @@ try:
                     if subject_data:
                         summary_table = pd.DataFrame(subject_data).T
                         summary_table.columns = ["Assigned Level / Progress Tracker"]
-                        st.table(summary_table)
+                        
+                        # ✨ FIX: Swapped st.table for st.dataframe with width expansion turned on
+                        st.dataframe(summary_table, use_container_width=True)
                     else:
                         st.caption("*No supplementary internal school subject columns found in database.*")
 
@@ -140,7 +139,6 @@ try:
                     st.markdown(f"### **Holistic Pupil Performance Summary: {row.get('Name')}**")
                     st.write("---")
                     
-                    # Present data cleanly across three columns for a balanced overview
                     c1, c2, c3 = st.columns(3)
                     all_cols = [col for col in filtered_df.columns if col != 'Name']
                     
