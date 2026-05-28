@@ -25,37 +25,34 @@ def load_data():
     data = data.fillna("")
     return data
 
-# Helper function to find, crop, and display the left half of a student photo
+# ✨ UPDATED: Strips out any periods from the student's name before searching
 def display_student_photo(student_name):
-    safe_name = str(student_name).strip()
-    folder_path = "photos"
+    # This removes extra spaces AND deletes any periods (e.g., "A.J." becomes "AJ")
+    safe_name = str(student_name).strip().replace(".", "")
+    folder_path = "." # The dot means "look right here in the main folder"
 
-    # 1. Check if the folder even exists in the cloud
-    if not os.path.exists(folder_path):
-        st.caption("*(Error: 'photos' folder not found on GitHub)*")
-        return
+    # Look for the file in the current directory, ignoring uppercase/lowercase differences
+    try:
+        all_files = os.listdir(folder_path)
+        file_map = {f.lower(): f for f in all_files} 
         
-    # 2. Look for the file, ignoring uppercase/lowercase differences
-    all_files = os.listdir(folder_path)
-    file_map = {f.lower(): f for f in all_files} 
-    
-    # We force the search to look for lowercase .png to bypass case-sensitivity errors
-    target_filename = f"{safe_name.lower()}.png"
-    
-    if target_filename in file_map:
-        actual_filename = file_map[target_filename]
-        image_path = os.path.join(folder_path, actual_filename)
-        try:
-            img = Image.open(image_path)
-            width, height = img.size
-            left_half_box = (0, 0, width // 2, height)
-            cropped_img = img.crop(left_half_box)
-            st.image(cropped_img, width=150)
-        except Exception as e:
-            st.caption("*(File is corrupted or not a valid image)*")
-    else:
-        # 3. Tell us EXACTLY what file name it is failing to find
-        st.caption(f"*(Missing exact file: {safe_name}.png)*")
+        target_filename = f"{safe_name.lower()}.png"
+        
+        if target_filename in file_map:
+            actual_filename = file_map[target_filename]
+            image_path = os.path.join(folder_path, actual_filename)
+            try:
+                img = Image.open(image_path)
+                width, height = img.size
+                left_half_box = (0, 0, width // 2, height)
+                cropped_img = img.crop(left_half_box)
+                st.image(cropped_img, width=150)
+            except Exception as e:
+                st.caption("*(File is corrupted or not a valid image)*")
+        else:
+            st.caption(f"*(Missing photo: {safe_name}.png)*")
+    except Exception as e:
+        st.caption("*(System error scanning files)*")
 
 try:
     df = load_data()
