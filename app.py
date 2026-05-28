@@ -159,7 +159,7 @@ try:
                 else:
                     st.caption("*No supplementary internal school subject columns found in database.*")
 
-    # 3. YEAR 9 TRANSITION REPORT
+# 3. YEAR 9 TRANSITION REPORT
     elif st.session_state.active_report == "y9_transition":
         st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
         restricted_terms = ["projected", "target", "subject", "report", "grade"]
@@ -172,3 +172,38 @@ try:
         for index, row in filtered_df[cols_to_keep].iterrows():
             box_header = get_header_title(row, "Year 9 Transition Profile")
             with st.expander(f"📁 {box_header}"):
+                st.markdown(f"### **Key Transition Profile: {row.get(NAME_COLUMN)}**")
+                st.write("---")
+                
+                info_col1, info_col2 = st.columns(2)
+                display_cols = [col for col in cols_to_keep if col not in [NAME_COLUMN, DOB_COLUMN]]
+                for i, col in enumerate(display_cols):
+                    if i % 2 == 0:
+                        info_col1.markdown(f"🔹 **{col}:** {row[col]}")
+                    else:
+                        info_col2.markdown(f"🔹 **{col}:** {row[col]}")
+
+    # 4. YEAR 9 FULL REPORT
+    elif st.session_state.active_report == "y9_full":
+        st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
+        
+        for index, row in filtered_df.iterrows():
+            box_header = get_header_title(row, "Full Holistic Record")
+            with st.expander(f"🎓 {box_header}"):
+                st.write("---")
+                
+                c1, c2, c3 = st.columns(3)
+                all_cols = [col for col in filtered_df.columns if col not in [NAME_COLUMN, DOB_COLUMN]]
+                
+                for i, col in enumerate(all_cols):
+                    content_string = f"📌 **{col}:** {row[col]}"
+                    if i % 3 == 0:
+                        c1.markdown(content_string)
+                    elif i % 3 == 1:
+                        c2.markdown(content_string)
+                    else:
+                        c3.markdown(content_string)
+
+except Exception as e:
+    st.error("Error running application layout logic. Verify spreadsheet column titles.")
+    st.exception(e)
