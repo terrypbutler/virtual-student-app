@@ -50,7 +50,7 @@ def display_student_photo(student_name, cohort):
                 
                 # ✨ NEW: Calculate the top and bottom trim (Currently set to shave off 15%)
                 # Change 0.15 to 0.10 if it cuts off too much, or 0.20 to zoom in more
-                trim_amount = int(height * 0.07) 
+                trim_amount = int(height * 0.08) 
                 top_edge = trim_amount
                 bottom_edge = height - trim_amount
                 
