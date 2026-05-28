@@ -25,13 +25,17 @@ def load_data():
     data = data.fillna("")
     return data
 
-# ✨ UPDATED: Strips out any periods from the student's name before searching
+# ✨ UPDATED: Now looks explicitly inside your new 'photos' folder
 def display_student_photo(student_name):
     # This removes extra spaces AND deletes any periods (e.g., "A.J." becomes "AJ")
     safe_name = str(student_name).strip().replace(".", "")
-    folder_path = "." # The dot means "look right here in the main folder"
+    folder_path = "photos" # Pointing directly to your uploaded folder
 
-    # Look for the file in the current directory, ignoring uppercase/lowercase differences
+    if not os.path.exists(folder_path):
+        st.caption("*(Error: 'photos' folder not found)*")
+        return
+
+    # Look for the file in the directory, ignoring uppercase/lowercase differences
     try:
         all_files = os.listdir(folder_path)
         file_map = {f.lower(): f for f in all_files} 
