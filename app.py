@@ -87,7 +87,6 @@ try:
         st.markdown(f"### 📄 Year 7 Passports — {view_label}")
         cols_to_keep = [col for col in filtered_df.columns if "subject" not in col.lower() and "report" not in col.lower()]
         
-        # Fixed looping syntax here ()
         for index, row in filtered_df[cols_to_keep].iterrows():
             s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
             with st.expander(f"👤 {s_name.upper()} — Year 7 Passport"):
@@ -98,4 +97,82 @@ try:
                 st.write("---")
                 
                 info_col1, info_col2 = st.columns(2)
-                for i, col in enumerate(
+                # Filter out name and metrics to prevent display duplication
+                display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, 'Key Stage 2', 'Reading Age']]
+                for i, col in enumerate(display_cols):
+                    if i % 2 == 0:
+                        info_col1.markdown(f"**{col}:** {row[col]}")
+                    else:
+                        info_col2.markdown(f"**{col}:** {row[col]}")
+
+    # 2. YEAR 7 SUBJECT REPORT
+    elif st.session_state.active_report == "y7_subject":
+        st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
+        
+        for index, row in filtered_df.iterrows():
+            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+            with st.expander(f"📊 {s_name.upper()} — Academic Progress Report"):
+                
+                m1, m2 = st.columns(2)
+                m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
+                m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
+                st.write("---")
+                
+                st.markdown("#### **📚 Subject Performance Breakdown**")
+                subject_data = {}
+                for col in filtered_df.columns:
+                    if any(term in col.lower() for term in ["subject", "grade", "score"]):
+                        if not any(term in col.lower() for term in ["target", "current", "set", "maths"]):
+                            subject_data[col] = [row[col]]
+                
+                if subject_data:
+                    summary_table = pd.DataFrame(subject_data).T
+                    summary_table.columns = ["Assigned Level / Progress Tracker"]
+                    st.dataframe(summary_table, use_container_width=True)
+                else:
+                    st.caption("*No supplementary internal school subject columns found in database.*")
+
+    # 3. YEAR 9 TRANSITION REPORT
+    elif st.session_state.active_report == "y9_transition":
+        st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
+        restricted_terms = ["projected", "target", "subject", "report", "grade"]
+        cols_to_keep = [col for col in filtered_df.columns if not any(term in col.lower() for term in restricted_terms)]
+        
+        for index, row in filtered_df[cols_to_keep].iterrows():
+            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+            with st.expander(f"📁 {s_name.upper()} — Year 9 Transition Profile"):
+                st.markdown(f"**Assigned Placement:** `Set {row.get(TARGET_COLUMN)}`")
+                st.write("---")
+                
+                info_col1, info_col2 = st.columns(2)
+                display_cols = [col for col in cols_to_keep if col not in [NAME_COLUMN, TARGET_COLUMN]]
+                for i, col in enumerate(display_cols):
+                    if i % 2 == 0:
+                        info_col1.markdown(f"🔹 **{col}:** {row[col]}")
+                    else:
+                        info_col2.markdown(f"🔹 **{col}:** {row[col]}")
+
+    # 4. YEAR 9 FULL REPORT
+    elif st.session_state.active_report == "y9_full":
+        st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
+        
+        for index, row in filtered_df.iterrows():
+            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+            with st.expander(f"🎓 {s_name.upper()} — Full Holistic Record"):
+                st.write("---")
+                
+                c1, c2, c3 = st.columns(3)
+                all_cols = [col for col in filtered_df.columns if col != NAME_COLUMN]
+                
+                for i, col in enumerate(all_cols):
+                    content_string = f"📌 **{col}:** {row[col]}"
+                    if i % 3 == 0:
+                        c1.markdown(content_string)
+                    elif i % 3 == 1:
+                        c2.markdown(content_string)
+                    else:
+                        c3.markdown(content_string)
+
+except Exception as e:
+    st.error("Error running application layout logic. Verify spreadsheet column titles.")
+    st.exception(e)
