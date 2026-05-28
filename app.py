@@ -5,14 +5,13 @@ from PIL import Image
 
 st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 
-# ✨ NEW: Both of your dedicated live Google Sheets CSV data feeds
+# Both of your dedicated live Google Sheets CSV data feeds
 YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
 YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?gid=214766920&single=true&output=csv"
 
 # 🔒 SECURITY CONTROL: Hidden from all dataframes, tables, and reports completely
 COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
-# The function now takes the URL as an argument so it can switch datasets instantly
 @st.cache_data(ttl=10)
 def load_data(url):
     data = pd.read_csv(url)
@@ -62,7 +61,7 @@ try:
     st.title("🎓 Virtual Student Intake Dashboard")
     st.caption("Live simulation data framework for teacher training modules.")
     
-    # ✨ NEW: The Cohort Toggle Switch
+    # Cohort Toggle Switch
     selected_cohort = st.radio("📅 Select Cohort:", ["Year 7", "Year 9"], horizontal=True)
     st.write("---")
 
@@ -72,7 +71,6 @@ try:
     else:
         df = load_data(YEAR_9_URL)
 
-    TARGET_COLUMN = "Maths Set"
     NAME_COLUMN = "Full Name" 
     CUTOFF_COLUMN = "SAT's Maths"  
     DOB_COLUMN = "DoB"  
@@ -92,16 +90,29 @@ try:
                 return str(row_data[col])
         return "N/A"
 
-    # Class Set Filter Setup (Runs on whichever dataframe is currently loaded)
+    # ✨ NEW: View Type Toggle Switch
+    view_type = st.radio("🔍 Group View By:", ["Maths Set", "Tutor Group"], horizontal=True)
+
+    # Determine the target database column dynamically based on selection
+    if view_type == "Maths Set":
+        TARGET_COLUMN = "Maths Set"
+        display_label = "Academic Set"
+    else:
+        # Looks for any version of form/tutor columns in your sheet architecture
+        tutor_options = ["Form Group", "Tutor Group", "Form Tutor", "Tutor"]
+        TARGET_COLUMN = next((col for col in df.columns if col in tutor_options), "Form Group")
+        display_label = "Tutor Group"
+
+    # Class Set Filter Setup (Runs on dynamically selected view type)
     if TARGET_COLUMN in df.columns:
         available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
-        selected_set = st.selectbox(f"🎯 Select {selected_cohort} Academic Set:", available_sets)
+        selected_set = st.selectbox(f"🎯 Select {selected_cohort} {display_label}:", available_sets)
         filtered_df = df[df[TARGET_COLUMN] == selected_set]
-        view_label = selected_set
+        view_label = f"{display_label} {selected_set}"
     else:
-        st.warning(f"⚠️ Could not find a column named '{TARGET_COLUMN}' in your Google Sheet.")
+        st.warning(f"⚠️ Could not find a matching column for '{view_type}' in your Google Sheet.")
         filtered_df = df
-        view_label = "All Sets"
+        view_label = "All Cohorts"
 
     # Verify Crucial Columns exist to prevent app crashes
     if NAME_COLUMN not in df.columns:
@@ -112,7 +123,7 @@ try:
     # 🔍 OPTIONAL RAW DATA VIEW 
     st.write("")
     if st.checkbox(f"🔍 View Raw {selected_cohort} Dataset Matrix"):
-        st.subheader(f"Raw Data Grid: {selected_cohort} - Set {view_label}")
+        st.subheader(f"Raw Data Grid: {selected_cohort} - {view_label}")
         
         if CUTOFF_COLUMN in filtered_df.columns:
             all_cols = list(filtered_df.columns)
@@ -132,7 +143,7 @@ try:
 
     # Report & Passport Generation Panel
     st.subheader("📋 Report & Passport Generation Panel")
-    st.info(f"Select an output template below to process records for **{selected_cohort} - Set {view_label}**.")
+    st.info(f"Select an output template below to process records for **{selected_cohort} - {view_label}**.")
 
     # Use a session state flag to remember which button was clicked
     if 'active_report' not in st.session_state:
@@ -158,7 +169,7 @@ try:
 
     # 1. YEAR 7 TRANSITION PASSPORT
     if st.session_state.active_report == "y7_passport":
-        st.markdown(f"### 📄 Year 7 Passports — Set {view_label}")
+        st.markdown(f"### 📄 Year 7 Passports — {view_label}")
         cols_to_keep = [
             col for col in filtered_df.columns 
             if "subject" not in col.lower() 
@@ -244,7 +255,7 @@ try:
 
     # 2. YEAR 7 SUBJECT REPORT
     elif st.session_state.active_report == "y7_subject":
-        st.markdown(f"### 📊 Year 7 Subject Reports — Set {view_label}")
+        st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
         
         for index, row in filtered_df.iterrows():
             box_header = get_header_title(row, "Academic Progress Report")
@@ -263,6 +274,7 @@ try:
                 with photo_col:
                     display_student_photo(s_name)
                 
+                # Current/Target Metrics
                 m1, m2 = st.columns(2)
                 m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
@@ -331,7 +343,7 @@ try:
 
     # 3. YEAR 9 TRANSITION REPORT
     elif st.session_state.active_report == "y9_transition":
-        st.markdown(f"### 📄 Year 9 Transition Profiles — Set {view_label}")
+        st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
         restricted_terms = ["projected", "target", "subject", "report", "grade"]
         cols_to_keep = [
             col for col in filtered_df.columns 
@@ -362,7 +374,7 @@ try:
 
     # 4. YEAR 9 FULL REPORT
     elif st.session_state.active_report == "y9_full":
-        st.markdown(f"### 💯 Full Year 9 Cumulative Reports — Set {view_label}")
+        st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
         
         for index, row in filtered_df.iterrows():
             box_header = get_header_title(row, "Full Holistic Record")
