@@ -124,36 +124,43 @@ try:
             s_dob = str(row.get(DOB_COLUMN, "")).strip()
             
             with st.expander(f"👤 {box_header}"):
-                # ✨ FIXED: Stripped "Transition Passport" text. Just prints Name (DoB)
                 if s_dob:
                     st.markdown(f"### **{s_name} ({s_dob})**")
                 else:
                     st.markdown(f"### **{s_name}**")
                 
-                info_col1, info_col2 = st.columns(2)
+                # --- NEW EXPLICIT STRUCTURE ---
+                # Row 1: Gender & Form Tutor
+                r1_c1, r1_c2 = st.columns(2)
+                if "Gender" in row: r1_c1.markdown(f"**Gender:** {row['Gender']}")
+                if "Form Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Form Tutor']}")
+                elif "Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Tutor']}")
                 
-                # Core Balanced Grid Layout
-                if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
-                if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
-                if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
-                if "Key Stage 2" in row: info_col2.markdown(f"**Key Stage 2:** {row['Key Stage 2']}")
-                if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
-                if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
-                if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
-                if "CAT Verbal" in row: info_col2.markdown(f"**CAT Verbal:** {row['CAT Verbal']}")
+                # Row 2: Ethnicity & EAL
+                r2_c1, r2_c2 = st.columns(2)
+                if "Ethnicity" in row: r2_c1.markdown(f"**Ethnicity:** {row['Ethnicity']}")
+                if "EAL" in row: r2_c2.markdown(f"**EAL Status:** {row['EAL']}")
                 
-                # Safe string concatenation for SAT's Maths to avoid quote clashes
-                elif "SAT's Maths" in row: info_col2.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
+                # Row 3: SEN Detail & SEN Status
+                r3_c1, r3_c2 = st.columns(2)
+                if "SEND detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEND detail']}")
+                elif "SEN detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEN detail']}")
+                if "SEN Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEN Status']}")
+                elif "SEND Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEND Status']}")
                 
-                # Whitespace line-break spacer under SEND detail
-                st.write("") 
+                # Row 4: Disadvantaged (Full Line)
+                if "Premium" in row: st.markdown(f"**Disadvantaged:** {row['Premium']}")
+                elif "Disadvantaged" in row: st.markdown(f"**Disadvantaged:** {row['Disadvantaged']}")
                 
-                # Ethnicity baseline placement
-                if "Ethnicity" in row:
-                    st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
-                    
-                # Loop out any trailing miscellaneous notes columns left over in the background
-                handled_cols = [NAME_COLUMN, DOB_COLUMN, "Gender", "Premium", "EAL", "Key Stage 2", "Reading Age", "CAT Quantitative", "SEND detail", "Ethnicity", "CAT Verbal", "SAT's Maths"]
+                # Row 5: SATS
+                r5_c1, r5_c2 = st.columns(2)
+                if "SAT's Maths" in row: r5_c1.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
+                if "SAT's Reading" in row: r5_c2.markdown("**SAT's Reading:** " + str(row["SAT's Reading"]))
+                
+                st.write("") # Whitespace spacer
+                
+                # Loop out any trailing miscellaneous notes left over in the background
+                handled_cols = [NAME_COLUMN, DOB_COLUMN, "Gender", "Form Tutor", "Tutor", "Ethnicity", "EAL", "SEND detail", "SEN detail", "SEN Status", "SEND Status", "Premium", "Disadvantaged", "SAT's Maths", "SAT's Reading"]
                 leftover_cols = [c for c in cols_to_keep if c not in handled_cols]
                 
                 if leftover_cols:
@@ -180,21 +187,39 @@ try:
                 else:
                     st.markdown(f"### **Academic Progress Report: {s_name}**")
                 
-                # Top Background Profile Block (Mirrors passport styling perfectly)
-                info_col1, info_col2 = st.columns(2)
-                if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
-                if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
-                if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
-                if "Key Stage 2" in row: info_col2.markdown(f"**Key Stage 2:** {row['Key Stage 2']}")
-                if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
-                if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
-                if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
-                if "Current Grade" in row: info_col2.markdown(f"**Current Grade:** {row['Current Grade']}")
-                elif "Target Grade" in row: info_col2.markdown(f"**Target Grade:** {row['Target Grade']}")
+                # Current/Target Metrics
+                m1, m2 = st.columns(2)
+                m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
+                m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
+                st.write("---")
                 
-                st.write("") 
-                if "Ethnicity" in row:
-                    st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
+                # --- NEW EXPLICIT STRUCTURE (Matches Passport) ---
+                # Row 1: Gender & Form Tutor
+                r1_c1, r1_c2 = st.columns(2)
+                if "Gender" in row: r1_c1.markdown(f"**Gender:** {row['Gender']}")
+                if "Form Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Form Tutor']}")
+                elif "Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Tutor']}")
+                
+                # Row 2: Ethnicity & EAL
+                r2_c1, r2_c2 = st.columns(2)
+                if "Ethnicity" in row: r2_c1.markdown(f"**Ethnicity:** {row['Ethnicity']}")
+                if "EAL" in row: r2_c2.markdown(f"**EAL Status:** {row['EAL']}")
+                
+                # Row 3: SEN Detail & SEN Status
+                r3_c1, r3_c2 = st.columns(2)
+                if "SEND detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEND detail']}")
+                elif "SEN detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEN detail']}")
+                if "SEN Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEN Status']}")
+                elif "SEND Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEND Status']}")
+                
+                # Row 4: Disadvantaged (Full Line)
+                if "Premium" in row: st.markdown(f"**Disadvantaged:** {row['Premium']}")
+                elif "Disadvantaged" in row: st.markdown(f"**Disadvantaged:** {row['Disadvantaged']}")
+                
+                # Row 5: SATS
+                r5_c1, r5_c2 = st.columns(2)
+                if "SAT's Maths" in row: r5_c1.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
+                if "SAT's Reading" in row: r5_c2.markdown("**SAT's Reading:** " + str(row["SAT's Reading"]))
                 
                 st.write("---")
                 st.markdown("#### **📚 Subject Performance Breakdown**")
