@@ -27,33 +27,35 @@ def load_data():
 
 # Helper function to find, crop, and display the left half of a student photo
 def display_student_photo(student_name):
-    # Construct the file path looking in the local 'photos' folder
-    # This expects names to match exactly: e.g., "John Smith" -> "photos/John Smith.png"
     safe_name = str(student_name).strip()
-    image_path = os.path.join("photos", f"{safe_name}.png")
+    folder_path = "photos"
+
+    # 1. Check if the folder even exists in the cloud
+    if not os.path.exists(folder_path):
+        st.caption("*(Error: 'photos' folder not found on GitHub)*")
+        return
+        
+    # 2. Look for the file, ignoring uppercase/lowercase differences
+    all_files = os.listdir(folder_path)
+    file_map = {f.lower(): f for f in all_files} 
     
-    if os.path.exists(image_path):
+    # We force the search to look for lowercase .png to bypass case-sensitivity errors
+    target_filename = f"{safe_name.lower()}.png"
+    
+    if target_filename in file_map:
+        actual_filename = file_map[target_filename]
+        image_path = os.path.join(folder_path, actual_filename)
         try:
-            # Open the full dual-image file
             img = Image.open(image_path)
-            
-            # Get dimensions (width, height)
             width, height = img.size
-            
-            # Define the crop box (left, upper, right, lower)
-            # We want the left half, so we crop from 0 to width/2
             left_half_box = (0, 0, width // 2, height)
-            
-            # Crop the image
             cropped_img = img.crop(left_half_box)
-            
-            # Display it in Streamlit
-            st.image(cropped_img, width=150) # You can adjust width=150 to change how big it appears
+            st.image(cropped_img, width=150)
         except Exception as e:
-            st.caption("*(Error processing photo file)*")
+            st.caption("*(File is corrupted or not a valid image)*")
     else:
-        # Failsafe if no photo is found for this specific student
-        st.caption("*(No photo available)*")
+        # 3. Tell us EXACTLY what file name it is failing to find
+        st.caption(f"*(Missing exact file: {safe_name}.png)*")
 
 try:
     df = load_data()
