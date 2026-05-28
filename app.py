@@ -43,6 +43,13 @@ try:
             return f"{s_name} ({s_dob}) — {report_label}"
         return f"{s_name} — {report_label}"
 
+    # Helper function to safely grab data for the strict HTML table mapping
+    def get_val(row_data, keys):
+        for k in keys:
+            if k in row_data.index and str(row_data[k]).strip() != "":
+                return str(row_data[k])
+        return "N/A"
+
     # Class Set Filter Setup
     if TARGET_COLUMN in df.columns:
         available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
@@ -124,47 +131,54 @@ try:
             s_dob = str(row.get(DOB_COLUMN, "")).strip()
             
             with st.expander(f"👤 {box_header}"):
+                # Top Headers stay exactly where they are
                 if s_dob:
                     st.markdown(f"### **{s_name} ({s_dob})**")
                 else:
                     st.markdown(f"### **{s_name}**")
                 
-                # --- NEW EXPLICIT STRUCTURE ---
-                # Row 1: Gender & Form Tutor
-                r1_c1, r1_c2 = st.columns(2)
-                if "Gender" in row: r1_c1.markdown(f"**Gender:** {row['Gender']}")
-                if "Form Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Form Tutor']}")
-                elif "Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Tutor']}")
-                
-                # Row 2: Ethnicity & EAL
-                r2_c1, r2_c2 = st.columns(2)
-                if "Ethnicity" in row: r2_c1.markdown(f"**Ethnicity:** {row['Ethnicity']}")
-                if "EAL" in row: r2_c2.markdown(f"**EAL Status:** {row['EAL']}")
-                
-                # Row 3: SEN Detail & SEN Status
-                r3_c1, r3_c2 = st.columns(2)
-                if "SEND detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEND detail']}")
-                elif "SEN detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEN detail']}")
-                if "SEN Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEN Status']}")
-                elif "SEND Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEND Status']}")
-                
-                # Row 4: Disadvantaged (Full Line)
-                if "Premium" in row: st.markdown(f"**Disadvantaged:** {row['Premium']}")
-                elif "Disadvantaged" in row: st.markdown(f"**Disadvantaged:** {row['Disadvantaged']}")
-                
-                # Row 5: SATS
-                r5_c1, r5_c2 = st.columns(2)
-                if "SAT's Maths" in row: r5_c1.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
-                if "SAT's Reading" in row: r5_c2.markdown("**SAT's Reading:** " + str(row["SAT's Reading"]))
-                
-                st.write("") # Whitespace spacer
-                
-                # Loop out any trailing miscellaneous notes left over in the background
-                handled_cols = [NAME_COLUMN, DOB_COLUMN, "Gender", "Form Tutor", "Tutor", "Ethnicity", "EAL", "SEND detail", "SEN detail", "SEN Status", "SEND Status", "Premium", "Disadvantaged", "SAT's Maths", "SAT's Reading"]
+                # ✨ NEW HTML MULTI-CELL TABLE
+                form_val = get_val(row, ["Form Tutor", "Tutor", "Form Group"])
+                gender_val = get_val(row, ["Gender"])
+                sen_status_val = get_val(row, ["SEN Status", "SEND Status"])
+                sen_detail_val = get_val(row, ["SEND detail", "SEN detail"])
+                eth_val = get_val(row, ["Ethnicity"])
+                eal_val = get_val(row, ["EAL", "EAL Status"])
+                dis_val = get_val(row, ["Premium", "Disadvantaged", "Pupil Premium"])
+                read_val = get_val(row, ["SAT's Reading", "Reading Score", "Reading Age"])
+                math_val = get_val(row, ["SAT's Maths", "Maths Score"])
+
+                table_html = f"""
+                <table style="width:100%; text-align:left; border: 1px solid #ddd; border-collapse: collapse; margin-bottom: 15px; background-color: white;">
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px; width: 50%;"><strong>Form Group:</strong> {form_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; width: 50%;"><strong>Gender:</strong> {gender_val}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SEN Status:</strong> {sen_status_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SEND Detail:</strong> {sen_detail_val}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>Ethnicity:</strong> {eth_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>EAL Status:</strong> {eal_val}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged:</strong> {dis_val}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Reading:</strong> {read_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Maths:</strong> {math_val}</td>
+                    </tr>
+                </table>
+                """
+                st.markdown(table_html, unsafe_allow_html=True)
+                    
+                # Loop out any trailing miscellaneous notes columns left over in the background
+                handled_keys = ["Form Tutor", "Tutor", "Form Group", "Gender", "SEN Status", "SEND Status", "SEND detail", "SEN detail", "Ethnicity", "EAL", "EAL Status", "Premium", "Disadvantaged", "Pupil Premium", "SAT's Reading", "Reading Score", "Reading Age", "SAT's Maths", "Maths Score"]
+                handled_cols = [NAME_COLUMN, DOB_COLUMN] + handled_keys
                 leftover_cols = [c for c in cols_to_keep if c not in handled_cols]
                 
                 if leftover_cols:
-                    st.write("---")
                     left_col, right_col = st.columns(2)
                     for i, col in enumerate(leftover_cols):
                         if i % 2 == 0:
@@ -193,33 +207,41 @@ try:
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
                 st.write("---")
                 
-                # --- NEW EXPLICIT STRUCTURE (Matches Passport) ---
-                # Row 1: Gender & Form Tutor
-                r1_c1, r1_c2 = st.columns(2)
-                if "Gender" in row: r1_c1.markdown(f"**Gender:** {row['Gender']}")
-                if "Form Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Form Tutor']}")
-                elif "Tutor" in row: r1_c2.markdown(f"**Form Tutor:** {row['Tutor']}")
-                
-                # Row 2: Ethnicity & EAL
-                r2_c1, r2_c2 = st.columns(2)
-                if "Ethnicity" in row: r2_c1.markdown(f"**Ethnicity:** {row['Ethnicity']}")
-                if "EAL" in row: r2_c2.markdown(f"**EAL Status:** {row['EAL']}")
-                
-                # Row 3: SEN Detail & SEN Status
-                r3_c1, r3_c2 = st.columns(2)
-                if "SEND detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEND detail']}")
-                elif "SEN detail" in row: r3_c1.markdown(f"**SEN Detail:** {row['SEN detail']}")
-                if "SEN Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEN Status']}")
-                elif "SEND Status" in row: r3_c2.markdown(f"**SEN Status:** {row['SEND Status']}")
-                
-                # Row 4: Disadvantaged (Full Line)
-                if "Premium" in row: st.markdown(f"**Disadvantaged:** {row['Premium']}")
-                elif "Disadvantaged" in row: st.markdown(f"**Disadvantaged:** {row['Disadvantaged']}")
-                
-                # Row 5: SATS
-                r5_c1, r5_c2 = st.columns(2)
-                if "SAT's Maths" in row: r5_c1.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
-                if "SAT's Reading" in row: r5_c2.markdown("**SAT's Reading:** " + str(row["SAT's Reading"]))
+                # ✨ NEW HTML MULTI-CELL TABLE (Mirrors Passport Profile exactly)
+                form_val = get_val(row, ["Form Tutor", "Tutor", "Form Group"])
+                gender_val = get_val(row, ["Gender"])
+                sen_status_val = get_val(row, ["SEN Status", "SEND Status"])
+                sen_detail_val = get_val(row, ["SEND detail", "SEN detail"])
+                eth_val = get_val(row, ["Ethnicity"])
+                eal_val = get_val(row, ["EAL", "EAL Status"])
+                dis_val = get_val(row, ["Premium", "Disadvantaged", "Pupil Premium"])
+                read_val = get_val(row, ["SAT's Reading", "Reading Score", "Reading Age"])
+                math_val = get_val(row, ["SAT's Maths", "Maths Score"])
+
+                table_html = f"""
+                <table style="width:100%; text-align:left; border: 1px solid #ddd; border-collapse: collapse; margin-bottom: 15px; background-color: white;">
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px; width: 50%;"><strong>Form Group:</strong> {form_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; width: 50%;"><strong>Gender:</strong> {gender_val}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SEN Status:</strong> {sen_status_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SEND Detail:</strong> {sen_detail_val}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>Ethnicity:</strong> {eth_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>EAL Status:</strong> {eal_val}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged:</strong> {dis_val}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Reading:</strong> {read_val}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SAT's Maths:</strong> {math_val}</td>
+                    </tr>
+                </table>
+                """
+                st.markdown(table_html, unsafe_allow_html=True)
                 
                 st.write("---")
                 st.markdown("#### **📚 Subject Performance Breakdown**")
