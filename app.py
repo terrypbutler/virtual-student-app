@@ -32,9 +32,9 @@ try:
 
     TARGET_COLUMN = "Maths Set"
     NAME_COLUMN = "Full Name" 
-    CUTOFF_COLUMN = "SAT's Maths"  # The pivot column for your raw data view
+    CUTOFF_COLUMN = "SAT's Maths"  
 
-    # Class Set Filter Setup (We pull the filter choices BEFORE hiding anything)
+    # Class Set Filter Setup
     if TARGET_COLUMN in df.columns:
         available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
         selected_set = st.selectbox("🎯 Select Academic Set View:", available_sets)
@@ -49,25 +49,21 @@ try:
     if NAME_COLUMN not in df.columns:
         st.error(f"⚠️ Critical Error: Could not find the '{NAME_COLUMN}' column in your Google Sheet.")
 
-    # 🔍 OPTIONAL RAW DATA VIEW (With strict column limitations)
+    # 🔍 OPTIONAL RAW DATA VIEW 
     st.write("")
     if st.checkbox("🔍 View Raw Class Dataset Matrix"):
         st.subheader(f"Raw Data Grid: {view_label}")
         
-        # Slicing out Maths Set and everything to the right of SAT's Maths
         if CUTOFF_COLUMN in filtered_df.columns:
-            # Get a list of all columns up to and including SAT's Maths
             all_cols = list(filtered_df.columns)
             cutoff_index = all_cols.index(CUTOFF_COLUMN)
             allowed_cols = all_cols[:cutoff_index + 1]
             
-            # Make sure 'Maths Set' isn't accidentally caught in the left side mix
             if TARGET_COLUMN in allowed_cols:
                 allowed_cols.remove(TARGET_COLUMN)
                 
             display_df = filtered_df[allowed_cols]
         else:
-            # Fallback if there's a typo in the column header name
             st.warning(f"Could not find exact column '{CUTOFF_COLUMN}' to slice layout. Displaying general view.")
             display_df = filtered_df.drop(columns=[TARGET_COLUMN] if TARGET_COLUMN in filtered_df.columns else [])
 
@@ -109,14 +105,12 @@ try:
         for index, row in filtered_df[cols_to_keep].iterrows():
             s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
             with st.expander(f"👤 {s_name.upper()} — Year 7 Passport"):
+                st.markdown(f"### **Transition Passport: {s_name}**")
                 
-                m1, m2 = st.columns(2)
-                m1.metric("KS2 Score Reference", row.get('Key Stage 2', 'N/A'))
-                m2.metric("Reading Age Entry", row.get('Reading Age', 'N/A'))
-                st.write("---")
-                
+                # ✨ REMOVED: Metric rows are gone! Data now processes into the grid cleanly below.
                 info_col1, info_col2 = st.columns(2)
-                display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, 'Key Stage 2', 'Reading Age']]
+                display_cols = [c for c in cols_to_keep if c != NAME_COLUMN]
+                
                 for i, col in enumerate(display_cols):
                     if i % 2 == 0:
                         info_col1.markdown(f"**{col}:** {row[col]}")
@@ -194,3 +188,4 @@ try:
 except Exception as e:
     st.error("Error running application layout logic. Verify spreadsheet column titles.")
     st.exception(e)
+    
