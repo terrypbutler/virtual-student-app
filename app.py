@@ -129,6 +129,7 @@ try:
             s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
             with st.expander(f"📊 {s_name.upper()} — Academic Progress Report"):
                 
+                # Visual highlight metrics for core grades
                 m1, m2 = st.columns(2)
                 m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
@@ -191,3 +192,8 @@ try:
                     elif i % 3 == 1:
                         c2.markdown(content_string)
                     else:
+                        c3.markdown(content_string)
+
+except Exception as e:
+    st.error("Error running application layout logic. Verify spreadsheet column titles.")
+    st.exception(e)
