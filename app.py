@@ -34,6 +34,21 @@ try:
     NAME_COLUMN = "Full Name" 
     CUTOFF_COLUMN = "SAT's Maths"  
 
+    # ✨ DOB COLUMN HUNTER: Looks for "Date of Birth" or "DOB" in your headers
+    dob_col = None
+    for col in df.columns:
+        if "birth" in col.lower() or col.lower() == "dob":
+            dob_col = col
+            break
+
+    # Helper function to generate uniform headers with Name and DOB side-by-side
+    def get_header_title(row_data, report_label):
+        s_name = str(row_data.get(NAME_COLUMN, "Unknown Student")).strip().upper()
+        if dob_col and row_data.get(dob_col):
+            s_dob = str(row_data.get(dob_col)).strip()
+            return f"{s_name} ({s_dob}) — {report_label}"
+        return f"{s_name} — {report_label}"
+
     # Class Set Filter Setup
     if TARGET_COLUMN in df.columns:
         available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
@@ -108,12 +123,13 @@ try:
         ]
         
         for index, row in filtered_df[cols_to_keep].iterrows():
-            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
-            with st.expander(f"👤 {s_name.upper()} — Year 7 Passport"):
-                st.markdown(f"### **Transition Passport: {s_name}**")
+            box_header = get_header_title(row, "Year 7 Passport")
+            with st.expander(f"👤 {box_header}"):
+                st.markdown(f"### **Transition Passport: {row.get(NAME_COLUMN)}**")
                 
                 info_col1, info_col2 = st.columns(2)
-                display_cols = [c for c in cols_to_keep if c != NAME_COLUMN]
+                # Keep DOB from printing twice inside the grid list if it's already in the header
+                display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, dob_col]]
                 
                 for i, col in enumerate(display_cols):
                     if i % 2 == 0:
@@ -126,10 +142,9 @@ try:
         st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
         
         for index, row in filtered_df.iterrows():
-            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
-            with st.expander(f"📊 {s_name.upper()} — Academic Progress Report"):
+            box_header = get_header_title(row, "Academic Progress Report")
+            with st.expander(f"📊 {box_header}"):
                 
-                # Visual highlight metrics for core grades
                 m1, m2 = st.columns(2)
                 m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
@@ -160,13 +175,13 @@ try:
         ]
         
         for index, row in filtered_df[cols_to_keep].iterrows():
-            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
-            with st.expander(f"📁 {s_name.upper()} — Year 9 Transition Profile"):
-                st.markdown(f"### **Key Transition Profile: {s_name}**")
+            box_header = get_header_title(row, "Year 9 Transition Profile")
+            with st.expander(f"📁 {box_header}"):
+                st.markdown(f"### **Key Transition Profile: {row.get(NAME_COLUMN)}**")
                 st.write("---")
                 
                 info_col1, info_col2 = st.columns(2)
-                display_cols = [col for col in cols_to_keep if col != NAME_COLUMN]
+                display_cols = [col for col in cols_to_keep if col not in [NAME_COLUMN, dob_col]]
                 for i, col in enumerate(display_cols):
                     if i % 2 == 0:
                         info_col1.markdown(f"🔹 **{col}:** {row[col]}")
@@ -178,12 +193,12 @@ try:
         st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
         
         for index, row in filtered_df.iterrows():
-            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
-            with st.expander(f"🎓 {s_name.upper()} — Full Holistic Record"):
+            box_header = get_header_title(row, "Full Holistic Record")
+            with st.expander(f"🎓 {box_header}"):
                 st.write("---")
                 
                 c1, c2, c3 = st.columns(3)
-                all_cols = [col for col in filtered_df.columns if col != NAME_COLUMN]
+                all_cols = [col for col in filtered_df.columns if col not in [NAME_COLUMN, dob_col]]
                 
                 for i, col in enumerate(all_cols):
                     content_string = f"📌 **{col}:** {row[col]}"
@@ -197,3 +212,4 @@ try:
 except Exception as e:
     st.error("Error running application layout logic. Verify spreadsheet column titles.")
     st.exception(e)
+    
