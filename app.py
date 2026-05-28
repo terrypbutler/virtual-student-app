@@ -6,7 +6,7 @@ st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 # Your live Google Sheets CSV data feed link
 DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
 
-# 🔒 SECURITY CONTROL: Hidden from all dataframes, tables, and reports
+# 🔒 SECURITY CONTROL: Hidden from all dataframes, tables, and reports completely
 COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
 @st.cache_data(ttl=10)
@@ -32,8 +32,9 @@ try:
 
     TARGET_COLUMN = "Maths Set"
     NAME_COLUMN = "Full Name" 
+    CUTOFF_COLUMN = "SAT's Maths"  # The pivot column for your raw data view
 
-    # Class Set Filter Setup
+    # Class Set Filter Setup (We pull the filter choices BEFORE hiding anything)
     if TARGET_COLUMN in df.columns:
         available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
         selected_set = st.selectbox("🎯 Select Academic Set View:", available_sets)
@@ -46,13 +47,31 @@ try:
 
     # Verify Name Column exists to prevent app crashes
     if NAME_COLUMN not in df.columns:
-        st.error(f"⚠️ Critical Error: Could not find the '{NAME_COLUMN}' column in your Google Sheet. Please check the spelling.")
+        st.error(f"⚠️ Critical Error: Could not find the '{NAME_COLUMN}' column in your Google Sheet.")
 
-    # 🔍 OPTIONAL RAW DATA VIEW
+    # 🔍 OPTIONAL RAW DATA VIEW (With strict column limitations)
     st.write("")
     if st.checkbox("🔍 View Raw Class Dataset Matrix"):
         st.subheader(f"Raw Data Grid: {view_label}")
-        st.dataframe(filtered_df, use_container_width=True)
+        
+        # Slicing out Maths Set and everything to the right of SAT's Maths
+        if CUTOFF_COLUMN in filtered_df.columns:
+            # Get a list of all columns up to and including SAT's Maths
+            all_cols = list(filtered_df.columns)
+            cutoff_index = all_cols.index(CUTOFF_COLUMN)
+            allowed_cols = all_cols[:cutoff_index + 1]
+            
+            # Make sure 'Maths Set' isn't accidentally caught in the left side mix
+            if TARGET_COLUMN in allowed_cols:
+                allowed_cols.remove(TARGET_COLUMN)
+                
+            display_df = filtered_df[allowed_cols]
+        else:
+            # Fallback if there's a typo in the column header name
+            st.warning(f"Could not find exact column '{CUTOFF_COLUMN}' to slice layout. Displaying general view.")
+            display_df = filtered_df.drop(columns=[TARGET_COLUMN] if TARGET_COLUMN in filtered_df.columns else [])
+
+        st.dataframe(display_df, use_container_width=True)
     st.write("---")
 
     # Report & Passport Processing Interface
@@ -97,7 +116,6 @@ try:
                 st.write("---")
                 
                 info_col1, info_col2 = st.columns(2)
-                # Filter out name and metrics to prevent display duplication
                 display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, 'Key Stage 2', 'Reading Age']]
                 for i, col in enumerate(display_cols):
                     if i % 2 == 0:
