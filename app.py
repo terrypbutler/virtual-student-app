@@ -33,7 +33,7 @@ try:
     TARGET_COLUMN = "Maths Set"
     NAME_COLUMN = "Full Name" 
     CUTOFF_COLUMN = "SAT's Maths"  
-    DOB_COLUMN = "DoB"  # ✨ LOCKED ONTO YOUR EXACT HEADER: DoB
+    DOB_COLUMN = "DoB"  # Locked onto your exact header: DoB
 
     # Helper function to generate uniform headers with Name and DOB side-by-side
     def get_header_title(row_data, report_label):
@@ -120,8 +120,15 @@ try:
         
         for index, row in filtered_df[cols_to_keep].iterrows():
             box_header = get_header_title(row, "Year 7 Passport")
+            s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+            s_dob = str(row.get(DOB_COLUMN, "")).strip()
+            
             with st.expander(f"👤 {box_header}"):
-                st.markdown(f"### **Transition Passport: {row.get(NAME_COLUMN)}**")
+                # ✨ FIXED: Inner passport heading now includes DoB side-by-side
+                if s_dob:
+                    st.markdown(f"### **Transition Passport: {s_name} ({s_dob})**")
+                else:
+                    st.markdown(f"### **Transition Passport: {s_name}**")
                 
                 info_col1, info_col2 = st.columns(2)
                 display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, DOB_COLUMN]]
@@ -159,7 +166,7 @@ try:
                 else:
                     st.caption("*No supplementary internal school subject columns found in database.*")
 
-# 3. YEAR 9 TRANSITION REPORT
+   # 3. YEAR 9 TRANSITION REPORT
     elif st.session_state.active_report == "y9_transition":
         st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
         restricted_terms = ["projected", "target", "subject", "report", "grade"]
