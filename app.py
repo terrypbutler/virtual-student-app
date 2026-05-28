@@ -1,15 +1,21 @@
 import streamlit as st
 import pandas as pd
+import requests
+import io
 
 st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 
-# Your personal OneDrive link converted to a direct data stream
+# Your personal OneDrive link
 EXCEL_LIVE_URL = "https://1drv.ms/x/c/4e58796b40951c18/IQQQ019JbjbJTpN5nkOfl2hZATe8W6mRfUzc1KldB8qTCRw?download=1"
 
-@st.cache_data(ttl=10) # Refreshes very quickly (every 10 seconds) for easy testing
+@st.cache_data(ttl=10)
 def load_data():
-    # Reads the live OneDrive Excel file directly into Python
-    return pd.read_excel(EXCEL_LIVE_URL)
+    # 1. Force Python to follow the OneDrive redirects and download the raw file bytes
+    response = requests.get(EXCEL_LIVE_URL, allow_redirects=True)
+    
+    # 2. Feed those raw bytes directly into the pandas Excel engine
+    file_bytes = io.BytesIO(response.content)
+    return pd.read_excel(file_bytes, engine='openpyxl')
 
 try:
     df = load_data()
