@@ -75,7 +75,7 @@ try:
 
     st.write("---")
 
-    # --- FULL WIDTH REPORT RENDERING (Outside the columns) ---
+    # --- FULL WIDTH REPORT RENDERING ---
 
     # 1. YEAR 7 TRANSITION PASSPORT
     if st.session_state.active_report == "y7_passport":
@@ -83,8 +83,8 @@ try:
         cols_to_keep = [col for col in filtered_df.columns if "subject" not in col.lower() and "report" not in col.lower()]
         
         for index, row in filtered_df[cols_to_keep].iterrows():
-            with st.expander(f"👤 Passport: {row.get('Name', 'Unknown Student')}"):
-                st.markdown(f"### **Transition Passport: {row.get('Name')}**")
+            # ✨ FIXED: Student Name is now the main header on the expander box
+            with st.expander(f"👤 {row.get('Name', 'Unknown Student').upper()} — Year 7 Passport"):
                 
                 m1, m2 = st.columns(2)
                 m1.metric("KS2 Score Reference", row.get('Key Stage 2', 'N/A'))
@@ -103,8 +103,8 @@ try:
         st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
         
         for index, row in filtered_df.iterrows():
-            with st.expander(f"📊 Full Report: {row.get('Name', 'Unknown Student')}"):
-                st.markdown(f"### **Academic Progress Report: {row.get('Name')}**")
+            # ✨ FIXED: Student Name is now the main header on the expander box
+            with st.expander(f"📊 {row.get('Name', 'Unknown Student').upper()} — Academic Progress Report"):
                 
                 m1, m2 = st.columns(2)
                 m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
@@ -132,8 +132,8 @@ try:
         cols_to_keep = [col for col in filtered_df.columns if not any(term in col.lower() for term in restricted_terms)]
         
         for index, row in filtered_df[cols_to_keep].iterrows():
-            with st.expander(f"📁 Transition Record: {row.get('Name', 'Unknown Student')}"):
-                st.markdown(f"### **Key Transition Profile: {row.get('Name')}**")
+            # ✨ FIXED: Student Name is now the main header on the expander box
+            with st.expander(f"📁 {row.get('Name', 'Unknown Student').upper()} — Year 9 Transition Profile"):
                 st.markdown(f"**Assigned Placement:** `Set {row.get(TARGET_COLUMN)}`")
                 st.write("---")
                 
@@ -150,8 +150,8 @@ try:
         st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
         
         for index, row in filtered_df.iterrows():
-            with st.expander(f"🎓 Complete Record: {row.get('Name', 'Unknown Student')}"):
-                st.markdown(f"### **Holistic Pupil Performance Summary: {row.get('Name')}**")
+            # ✨ FIXED: Student Name is now the main header on the expander box
+            with st.expander(f"🎓 {row.get('Name', 'Unknown Student').upper()} — Full Holistic Record"):
                 st.write("---")
                 
                 c1, c2, c3 = st.columns(3)
