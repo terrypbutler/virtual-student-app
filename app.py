@@ -5,15 +5,17 @@ from PIL import Image
 
 st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 
-# Your live Google Sheets CSV data feed link
-DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
+# ✨ NEW: Both of your dedicated live Google Sheets CSV data feeds
+YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
+YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?gid=214766920&single=true&output=csv"
 
 # 🔒 SECURITY CONTROL: Hidden from all dataframes, tables, and reports completely
 COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
+# The function now takes the URL as an argument so it can switch datasets instantly
 @st.cache_data(ttl=10)
-def load_data():
-    data = pd.read_csv(DATA_URL)
+def load_data(url):
+    data = pd.read_csv(url)
     data.columns = data.columns.str.strip() # Clean hidden spaces from headers
     
     # Drop hidden columns instantly upon loading if they exist
@@ -25,17 +27,15 @@ def load_data():
     data = data.fillna("")
     return data
 
-# ✨ UPDATED: Now looks explicitly inside your new 'photos' folder
+# Helper function to find, crop, and display the left half of a student photo
 def display_student_photo(student_name):
-    # This removes extra spaces AND deletes any periods (e.g., "A.J." becomes "AJ")
     safe_name = str(student_name).strip().replace(".", "")
-    folder_path = "photos" # Pointing directly to your uploaded folder
+    folder_path = "photos" 
 
     if not os.path.exists(folder_path):
         st.caption("*(Error: 'photos' folder not found)*")
         return
 
-    # Look for the file in the directory, ignoring uppercase/lowercase differences
     try:
         all_files = os.listdir(folder_path)
         file_map = {f.lower(): f for f in all_files} 
@@ -59,18 +59,25 @@ def display_student_photo(student_name):
         st.caption("*(System error scanning files)*")
 
 try:
-    df = load_data()
-    
     st.title("🎓 Virtual Student Intake Dashboard")
     st.caption("Live simulation data framework for teacher training modules.")
+    
+    # ✨ NEW: The Cohort Toggle Switch
+    selected_cohort = st.radio("📅 Select Cohort:", ["Year 7", "Year 9"], horizontal=True)
     st.write("---")
+
+    # Load the correct URL based on the toggle switch
+    if selected_cohort == "Year 7":
+        df = load_data(YEAR_7_URL)
+    else:
+        df = load_data(YEAR_9_URL)
 
     TARGET_COLUMN = "Maths Set"
     NAME_COLUMN = "Full Name" 
     CUTOFF_COLUMN = "SAT's Maths"  
     DOB_COLUMN = "DoB"  
 
-    # Helper function to generate uniform headers with Name and DOB side-by-side
+    # Helper function to generate uniform headers
     def get_header_title(row_data, report_label):
         s_name = str(row_data.get(NAME_COLUMN, "Unknown Student")).strip().upper()
         if DOB_COLUMN in row_data and str(row_data[DOB_COLUMN]).strip():
@@ -78,7 +85,6 @@ try:
             return f"{s_name} ({s_dob}) — {report_label}"
         return f"{s_name} — {report_label}"
 
-    # Helper function (Case-insensitive) to grab data for the table
     def get_val(row_data, keys):
         keys_lower = [k.lower() for k in keys]
         for col in row_data.index:
@@ -86,16 +92,16 @@ try:
                 return str(row_data[col])
         return "N/A"
 
-    # Class Set Filter Setup
+    # Class Set Filter Setup (Runs on whichever dataframe is currently loaded)
     if TARGET_COLUMN in df.columns:
         available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
-        selected_set = st.selectbox("🎯 Select Academic Set View:", available_sets)
+        selected_set = st.selectbox(f"🎯 Select {selected_cohort} Academic Set:", available_sets)
         filtered_df = df[df[TARGET_COLUMN] == selected_set]
         view_label = selected_set
     else:
         st.warning(f"⚠️ Could not find a column named '{TARGET_COLUMN}' in your Google Sheet.")
         filtered_df = df
-        view_label = "All Cohorts"
+        view_label = "All Sets"
 
     # Verify Crucial Columns exist to prevent app crashes
     if NAME_COLUMN not in df.columns:
@@ -105,8 +111,8 @@ try:
 
     # 🔍 OPTIONAL RAW DATA VIEW 
     st.write("")
-    if st.checkbox("🔍 View Raw Class Dataset Matrix"):
-        st.subheader(f"Raw Data Grid: {view_label}")
+    if st.checkbox(f"🔍 View Raw {selected_cohort} Dataset Matrix"):
+        st.subheader(f"Raw Data Grid: {selected_cohort} - Set {view_label}")
         
         if CUTOFF_COLUMN in filtered_df.columns:
             all_cols = list(filtered_df.columns)
@@ -126,7 +132,7 @@ try:
 
     # Report & Passport Generation Panel
     st.subheader("📋 Report & Passport Generation Panel")
-    st.info(f"Select an output template below to process all student records currently loaded for **{view_label}**.")
+    st.info(f"Select an output template below to process records for **{selected_cohort} - Set {view_label}**.")
 
     # Use a session state flag to remember which button was clicked
     if 'active_report' not in st.session_state:
@@ -152,7 +158,7 @@ try:
 
     # 1. YEAR 7 TRANSITION PASSPORT
     if st.session_state.active_report == "y7_passport":
-        st.markdown(f"### 📄 Year 7 Passports — {view_label}")
+        st.markdown(f"### 📄 Year 7 Passports — Set {view_label}")
         cols_to_keep = [
             col for col in filtered_df.columns 
             if "subject" not in col.lower() 
@@ -167,7 +173,6 @@ try:
             
             with st.expander(f"👤 {box_header}"):
                 
-                # Setup a layout with the photo on the right, title on the left
                 title_col, photo_col = st.columns([3, 1])
                 
                 with title_col:
@@ -179,7 +184,6 @@ try:
                 with photo_col:
                     display_student_photo(s_name)
                 
-                # ✨ UNIFIED DATA KEYS: Ensures table items are NEVER duplicated below
                 form_keys = ["Form Tutor", "Tutor", "Form Group"]
                 gender_keys = ["Gender"]
                 sen_status_keys = ["SEN Status", "SEND Status"]
@@ -190,7 +194,6 @@ try:
                 read_keys = ["SATs Reading", "SAT's Reading", "Reading Score"]
                 math_keys = ["SATs Maths", "SAT's Maths", "Maths Score"]
                 
-                # Dynamic Table Data Grabs
                 form_val = get_val(row, form_keys)
                 gender_val = get_val(row, gender_keys)
                 sen_status_val = get_val(row, sen_status_keys)
@@ -226,7 +229,6 @@ try:
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
                     
-                # The handled keys are now combined directly, mathematically preventing duplicates
                 handled_keys = form_keys + gender_keys + sen_status_keys + sen_detail_keys + eth_keys + eal_keys + dis_keys + read_keys + math_keys
                 handled_cols_lower = [NAME_COLUMN.lower(), DOB_COLUMN.lower()] + [k.lower() for k in handled_keys]
                 
@@ -242,7 +244,7 @@ try:
 
     # 2. YEAR 7 SUBJECT REPORT
     elif st.session_state.active_report == "y7_subject":
-        st.markdown(f"### 📊 Year 7 Subject Reports — {view_label}")
+        st.markdown(f"### 📊 Year 7 Subject Reports — Set {view_label}")
         
         for index, row in filtered_df.iterrows():
             box_header = get_header_title(row, "Academic Progress Report")
@@ -261,13 +263,11 @@ try:
                 with photo_col:
                     display_student_photo(s_name)
                 
-                # Current/Target Metrics
                 m1, m2 = st.columns(2)
                 m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
                 m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
                 st.write("---")
                 
-                # ✨ UNIFIED DATA KEYS
                 form_keys = ["Form Tutor", "Tutor", "Form Group"]
                 gender_keys = ["Gender"]
                 sen_status_keys = ["SEN Status", "SEND Status"]
@@ -290,107 +290,3 @@ try:
 
                 table_html = f"""
                 <table style="width:100%; text-align:left; border: 1px solid #ddd; border-collapse: collapse; margin-bottom: 15px; background-color: white;">
-                    <tr>
-                        <td style="border: 1px solid #ddd; padding: 10px; width: 50%;"><strong>Form Group:</strong> {form_val}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; width: 50%;"><strong>Gender:</strong> {gender_val}</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SEN Status:</strong> {sen_status_val}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SEND Detail:</strong> {sen_detail_val}</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>Ethnicity:</strong> {eth_val}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>EAL Status:</strong> {eal_val}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="border: 1px solid #ddd; padding: 10px;"><strong>Disadvantaged (PP):</strong> {dis_val}</td>
-                    </tr>
-                    <tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SATs Reading:</strong> {read_val}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px;"><strong>SATs Maths:</strong> {math_val}</td>
-                    </tr>
-                </table>
-                """
-                st.markdown(table_html, unsafe_allow_html=True)
-                
-                st.write("---")
-                st.markdown("#### **📚 Subject Performance Breakdown**")
-                
-                subject_data = {}
-                for col in filtered_df.columns:
-                    if any(term in col.lower() for term in ["subject", "grade", "score"]):
-                        if not any(term in col.lower() for term in ["target", "current", "set", "maths", "cutoff", "reading"]):
-                            subject_data[col] = [row[col]]
-                
-                if subject_data:
-                    summary_table = pd.DataFrame(subject_data).T
-                    summary_table.columns = ["Assigned Level / Progress Tracker"]
-                    st.dataframe(summary_table, use_container_width=True)
-                else:
-                    st.caption("*No supplementary internal school subject columns found in database.*")
-
-    # 3. YEAR 9 TRANSITION REPORT
-    elif st.session_state.active_report == "y9_transition":
-        st.markdown(f"### 📄 Year 9 Transition Profiles — {view_label}")
-        restricted_terms = ["projected", "target", "subject", "report", "grade"]
-        cols_to_keep = [
-            col for col in filtered_df.columns 
-            if not any(term in col.lower() for term in restricted_terms)
-            and col != TARGET_COLUMN
-        ]
-        
-        for index, row in filtered_df[cols_to_keep].iterrows():
-            box_header = get_header_title(row, "Year 9 Transition Profile")
-            with st.expander(f"📁 {box_header}"):
-                
-                # Same photo logic for Year 9
-                s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
-                title_col, photo_col = st.columns([3, 1])
-                with title_col:
-                    st.markdown(f"### **Key Transition Profile: {s_name}**")
-                with photo_col:
-                    display_student_photo(s_name)
-                    
-                st.write("---")
-                
-                info_col1, info_col2 = st.columns(2)
-                display_cols = [col for col in cols_to_keep if col not in [NAME_COLUMN, DOB_COLUMN]]
-                for i, col in enumerate(display_cols):
-                    if i % 2 == 0:
-                        info_col1.markdown(f"🔹 **{col}:** {row[col]}")
-                    else:
-                        info_col2.markdown(f"🔹 **{col}:** {row[col]}")
-
-    # 4. YEAR 9 FULL REPORT
-    elif st.session_state.active_report == "y9_full":
-        st.markdown(f"### 💯 Full Year 9 Cumulative Reports — {view_label}")
-        
-        for index, row in filtered_df.iterrows():
-            box_header = get_header_title(row, "Full Holistic Record")
-            with st.expander(f"🎓 {box_header}"):
-                
-                # Same photo logic for Year 9 Full
-                s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
-                title_col, photo_col = st.columns([3, 1])
-                with title_col:
-                    st.markdown(f"### **Full Holistic Record: {s_name}**")
-                with photo_col:
-                    display_student_photo(s_name)
-                    
-                st.write("---")
-                
-                c1, c2, c3 = st.columns(3)
-                all_cols = [col for col in filtered_df.columns if col not in [NAME_COLUMN, DOB_COLUMN]]
-                
-                for i, col in enumerate(all_cols):
-                    content_string = f"📌 **{col}:** {row[col]}"
-                    if i % 3 == 0:
-                        c1.markdown(content_string)
-                    elif i % 3 == 1:
-                        c2.markdown(content_string)
-                    else:
-                        c3.markdown(content_string)
-
-except Exception as e:
-    st.error("Error running application layout logic. Verify spreadsheet column titles.")
-    st.exception(e)
