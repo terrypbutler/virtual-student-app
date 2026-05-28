@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import os
+from PIL import Image
 
 st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 
@@ -22,6 +24,36 @@ def load_data():
     # Replace all blank/empty spreadsheet cells (NaN) with clean spaces
     data = data.fillna("")
     return data
+
+# Helper function to find, crop, and display the left half of a student photo
+def display_student_photo(student_name):
+    # Construct the file path looking in the local 'photos' folder
+    # This expects names to match exactly: e.g., "John Smith" -> "photos/John Smith.png"
+    safe_name = str(student_name).strip()
+    image_path = os.path.join("photos", f"{safe_name}.png")
+    
+    if os.path.exists(image_path):
+        try:
+            # Open the full dual-image file
+            img = Image.open(image_path)
+            
+            # Get dimensions (width, height)
+            width, height = img.size
+            
+            # Define the crop box (left, upper, right, lower)
+            # We want the left half, so we crop from 0 to width/2
+            left_half_box = (0, 0, width // 2, height)
+            
+            # Crop the image
+            cropped_img = img.crop(left_half_box)
+            
+            # Display it in Streamlit
+            st.image(cropped_img, width=150) # You can adjust width=150 to change how big it appears
+        except Exception as e:
+            st.caption("*(Error processing photo file)*")
+    else:
+        # Failsafe if no photo is found for this specific student
+        st.caption("*(No photo available)*")
 
 try:
     df = load_data()
@@ -131,10 +163,18 @@ try:
             s_dob = str(row.get(DOB_COLUMN, "")).strip()
             
             with st.expander(f"👤 {box_header}"):
-                if s_dob:
-                    st.markdown(f"### **{s_name} ({s_dob})**")
-                else:
-                    st.markdown(f"### **{s_name}**")
+                
+                # Setup a layout with the photo on the right, title on the left
+                title_col, photo_col = st.columns([3, 1])
+                
+                with title_col:
+                    if s_dob:
+                        st.markdown(f"### **{s_name} ({s_dob})**")
+                    else:
+                        st.markdown(f"### **{s_name}**")
+                        
+                with photo_col:
+                    display_student_photo(s_name)
                 
                 # ✨ UNIFIED DATA KEYS: Ensures table items are NEVER duplicated below
                 form_keys = ["Form Tutor", "Tutor", "Form Group"]
@@ -207,10 +247,16 @@ try:
             s_dob = str(row.get(DOB_COLUMN, "")).strip()
             
             with st.expander(f"📊 {box_header}"):
-                if s_dob:
-                    st.markdown(f"### **Academic Progress Report: {s_name} ({s_dob})**")
-                else:
-                    st.markdown(f"### **Academic Progress Report: {s_name}**")
+                
+                title_col, photo_col = st.columns([3, 1])
+                with title_col:
+                    if s_dob:
+                        st.markdown(f"### **Academic Progress Report: {s_name} ({s_dob})**")
+                    else:
+                        st.markdown(f"### **Academic Progress Report: {s_name}**")
+                        
+                with photo_col:
+                    display_student_photo(s_name)
                 
                 # Current/Target Metrics
                 m1, m2 = st.columns(2)
@@ -293,7 +339,15 @@ try:
         for index, row in filtered_df[cols_to_keep].iterrows():
             box_header = get_header_title(row, "Year 9 Transition Profile")
             with st.expander(f"📁 {box_header}"):
-                st.markdown(f"### **Key Transition Profile: {row.get(NAME_COLUMN)}**")
+                
+                # Same photo logic for Year 9
+                s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+                title_col, photo_col = st.columns([3, 1])
+                with title_col:
+                    st.markdown(f"### **Key Transition Profile: {s_name}**")
+                with photo_col:
+                    display_student_photo(s_name)
+                    
                 st.write("---")
                 
                 info_col1, info_col2 = st.columns(2)
@@ -311,6 +365,15 @@ try:
         for index, row in filtered_df.iterrows():
             box_header = get_header_title(row, "Full Holistic Record")
             with st.expander(f"🎓 {box_header}"):
+                
+                # Same photo logic for Year 9 Full
+                s_name = str(row.get(NAME_COLUMN, "Unknown Student"))
+                title_col, photo_col = st.columns([3, 1])
+                with title_col:
+                    st.markdown(f"### **Full Holistic Record: {s_name}**")
+                with photo_col:
+                    display_student_photo(s_name)
+                    
                 st.write("---")
                 
                 c1, c2, c3 = st.columns(3)
