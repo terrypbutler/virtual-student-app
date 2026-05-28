@@ -130,39 +130,13 @@ try:
                     st.markdown(f"### **Transition Passport: {s_name}**")
                 
                 info_col1, info_col2 = st.columns(2)
+                display_cols = [c for c in cols_to_keep if c not in [NAME_COLUMN, DOB_COLUMN]]
                 
-                # Core Balanced Grid Layout
-                if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
-                if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
-                if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
-                if "Key Stage 2" in row: info_col2.markdown(f"**Key Stage 2:** {row['Key Stage 2']}")
-                if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
-                if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
-                if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
-                if "CAT Verbal" in row: info_col2.markdown(f"**CAT Verbal:** {row['CAT Verbal']}")
-                
-                # ✨ FIXED: Using string addition avoids the quote clash entirely
-                elif "SAT's Maths" in row: info_col2.markdown("**SAT's Maths:** " + str(row["SAT's Maths"]))
-                
-                # Whitespace line-break spacer under SEND detail
-                st.write("") 
-                
-                # Ethnicity baseline placement
-                if "Ethnicity" in row:
-                    st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
-                    
-                # Loop out any trailing miscellaneous notes columns left over in the background
-                handled_cols = [NAME_COLUMN, DOB_COLUMN, "Gender", "Premium", "EAL", "Key Stage 2", "Reading Age", "CAT Quantitative", "SEND detail", "Ethnicity", "CAT Verbal", "SAT's Maths"]
-                leftover_cols = [c for c in cols_to_keep if c not in handled_cols]
-                
-                if leftover_cols:
-                    st.write("---")
-                    left_col, right_col = st.columns(2)
-                    for i, col in enumerate(leftover_cols):
-                        if i % 2 == 0:
-                            left_col.markdown(f"**{col}:** {row[col]}")
-                        else:
-                            right_col.markdown(f"**{col}:** {row[col]}")
+                for i, col in enumerate(display_cols):
+                    if i % 2 == 0:
+                        info_col1.markdown(f"**{col}:** {row[col]}")
+                    else:
+                        info_col2.markdown(f"**{col}:** {row[col]}")
 
     # 2. YEAR 7 SUBJECT REPORT
     elif st.session_state.active_report == "y7_subject":
@@ -179,25 +153,12 @@ try:
                 else:
                     st.markdown(f"### **Academic Progress Report: {s_name}**")
                 
-                # Top Background Profile Block (Mirrors passport styling perfectly)
-                info_col1, info_col2 = st.columns(2)
-                if "Gender" in row: info_col1.markdown(f"**Gender:** {row['Gender']}")
-                if "Premium" in row: info_col2.markdown(f"**Premium:** {row['Premium']}")
-                if "EAL" in row: info_col1.markdown(f"**EAL:** {row['EAL']}")
-                if "Key Stage 2" in row: info_col2.markdown(f"**Key Stage 2:** {row['Key Stage 2']}")
-                if "Reading Age" in row: info_col1.markdown(f"**Reading Age:** {row['Reading Age']}")
-                if "CAT Quantitative" in row: info_col2.markdown(f"**CAT Quantitative:** {row['CAT Quantitative']}")
-                if "SEND detail" in row: info_col1.markdown(f"**SEND detail:** {row['SEND detail']}")
-                if "Current Grade" in row: info_col2.markdown(f"**Current Grade:** {row['Current Grade']}")
-                elif "Target Grade" in row: info_col2.markdown(f"**Target Grade:** {row['Target Grade']}")
-                
-                st.write("") 
-                if "Ethnicity" in row:
-                    st.markdown(f"**Ethnicity:** {row['Ethnicity']}")
-                
+                m1, m2 = st.columns(2)
+                m1.metric("Current Working Grade", row.get('Current Grade', 'N/A'))
+                m2.metric("Target Minimum Expectation", row.get('Target Grade', 'N/A'))
                 st.write("---")
-                st.markdown("#### **📚 Subject Performance Breakdown**")
                 
+                st.markdown("#### **📚 Subject Performance Breakdown**")
                 subject_data = {}
                 for col in filtered_df.columns:
                     if any(term in col.lower() for term in ["subject", "grade", "score"]):
