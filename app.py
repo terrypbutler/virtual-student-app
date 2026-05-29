@@ -4,10 +4,7 @@ from PIL import Image
 import os
 
 from modules.data_loader import load_data
-from modules.report_renderers import (
-    render_y7_passports,
-    render_y9_transition
-)
+from modules.report_renderers import render_y7_passports, render_y9_transition
 
 # ---------------------------
 # CONFIG
@@ -27,6 +24,7 @@ df = load_data(YEAR_7_URL if selected_cohort == "Year 7" else YEAR_9_URL)
 # SIDEBAR NAV
 # ---------------------------
 st.sidebar.title("🎓 School MIS Dashboard")
+
 page = st.sidebar.radio(
     "Navigate",
     [
@@ -34,7 +32,8 @@ page = st.sidebar.radio(
         "Year 7 Passports",
         "Year 9 Transition",
         "Analytics"
-    ]
+    ],
+    key="sidebar_nav"
 )
 
 # ---------------------------
@@ -49,6 +48,7 @@ def render_student_passport(student_row, cohort):
     header = f"{s_name} ({s_dob})" if s_dob else s_name
 
     with st.expander(f"👤 {header}"):
+
         left, right = st.columns([3, 1])
 
         with left:
@@ -56,10 +56,12 @@ def render_student_passport(student_row, cohort):
 
         # ---------------- PHOTO ----------------
         photo_folder = "photos"
+
         if os.path.exists(photo_folder):
             try:
                 safe_name = s_name.strip().replace(".", "").lower()
                 filename = f"{safe_name}.png"
+
                 files = {f.lower(): f for f in os.listdir(photo_folder)}
 
                 if filename in files:
@@ -76,8 +78,10 @@ def render_student_passport(student_row, cohort):
 
                     img = img.crop(crop)
                     right.image(img, width=220)
+
                 else:
                     right.caption("*(Photo missing)*")
+
             except:
                 right.caption("*(Image error)*")
         else:
@@ -103,6 +107,7 @@ def render_student_passport(student_row, cohort):
         }
 
         table_html = "<table style='width:100%; border-collapse: collapse;'>"
+
         for label, keys in info.items():
             table_html += f"""
             <tr>
@@ -111,123 +116,28 @@ def render_student_passport(student_row, cohort):
                 </td>
             </tr>
             """
+
         table_html += "</table>"
+
         st.markdown(table_html, unsafe_allow_html=True)
+
 
 # ---------------------------
 # SEARCH PAGE
 # ---------------------------
 def student_search(df):
     st.title("🔍 Student Search (MIS View)")
-    query = st.text_input("Search student name")
+    query = st.text_input("Search student name", key="search_name")
+
     if query:
         results = df[df["Full Name"].str.contains(query, case=False, na=False)]
         st.write(f"Found {len(results)} students")
+
         if len(results) == 0:
             st.warning("No matches found.")
+
         for _, row in results.iterrows():
             render_student_passport(row, selected_cohort)
-
-# ---------------------------
-# FILTERS FOR YEAR 7
-# ---------------------------
-def year7_filters(df):
-    st.sidebar.subheader("Filter Year 7")
-    maths_col = "Maths Set" if "Maths Set" in df.columns else None
-    form_col = "Form Group" if "Form Group" in df.columns else None
-    filter_conditions = pd.Series([True] * len(df))
-
-    if maths_col:
-        selected_math = st.sidebar.multiselect("Maths Set", sorted(df[maths_col].dropna().unique()))
-        if selected_math:
-            filter_conditions &= df[maths_col].isin(selected_math)
-
-    if form_col:
-        selected_form = st.sidebar.multiselect("Form Group", sorted(df[form_col].dropna().unique()))
-        if selected_form:
-            filter_conditions &= df[form_col].isin(selected_form)
-
-    return df[filter_conditions]
-
-
-# ---------------------------
-# DYNAMIC YEAR 9 FILTERS
-# ---------------------------
-def year9_filters(df):
-    st.sidebar.subheader("Filter Year 9")
-
-    filter_conditions = pd.Series([True] * len(df), index=df.index)
-
-    # ---------------- Maths Set ----------------
-    maths_col = "Maths Set" if "Maths Set" in df.columns else None
-    if maths_col:
-        selected_math = st.sidebar.multiselect(
-            "Maths Set",
-            sorted(df[maths_col].dropna().astype(str).unique())
-        )
-
-        if selected_math:
-            filter_conditions &= df[maths_col].astype(str).isin(selected_math)
-
-    # ---------------- Form Group ----------------
-    form_col = None
-
-    for possible in ["Form Group", "Tutor Group", "Form Tutor", "Tutor"]:
-        if possible in df.columns:
-            form_col = possible
-            break
-
-    if form_col:
-        selected_form = st.sidebar.multiselect(
-            "Form Group",
-            sorted(df[form_col].dropna().astype(str).unique())
-        )
-
-        if selected_form:
-            filter_conditions &= df[form_col].astype(str).isin(selected_form)
-
-# ---------------- SUBJECT FILTER SYSTEM ----------------
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📚 Subject Filter")
-
-subject_columns = [
-    "Eng Lang",
-    "Eng Lit",
-    "Maths",
-    "Science",
-    "Art",
-    "Computing",
-    "Design",
-    "Drama",
-    "Geography",
-    "History",
-    "Hospitality",
-    "Music",
-    "Photography",
-    "Spanish",
-    "Sport"
-]
-
-# only use subjects that actually exist
-available_subjects = [
-    s for s in subject_columns
-    if s in df.columns
-]
-
-selected_subject = st.sidebar.selectbox(
-    "Subject",
-    ["All Subjects"] + available_subjects
-)
-
-# filter to students who actually have a value in that subject
-if selected_subject != "All Subjects":
-
-    filter_conditions &= (
-        df[selected_subject]
-        .fillna("")
-        .astype(str)
-        .str.strip() != ""
-    )
 
 
 # ---------------------------
@@ -235,11 +145,14 @@ if selected_subject != "All Subjects":
 # ---------------------------
 def analytics(df):
     st.title("📊 Cohort Analytics Dashboard")
+
     st.subheader("Overview")
     col1, col2, col3 = st.columns(3)
     col1.metric("Students", len(df))
+
     if "SEN Status" in df.columns:
         col2.metric("SEN", (df["SEN Status"].fillna("") != "").sum())
+
     if "EAL" in df.columns:
         col3.metric("EAL", (df["EAL"].fillna("") != "").sum())
 
@@ -248,6 +161,7 @@ def analytics(df):
     if "SEN Status" in df.columns:
         st.subheader("SEN Distribution")
         st.bar_chart(df["SEN Status"].value_counts())
+
     if "EAL" in df.columns:
         st.subheader("EAL Distribution")
         st.bar_chart(df["EAL"].value_counts())
@@ -255,63 +169,59 @@ def analytics(df):
     st.subheader("Raw Data")
     st.dataframe(df, use_container_width=True)
 
-# ---------------------------
-# YEAR 9 TRANSITION PAGE
-# ---------------------------
-if page == "Year 9 Transition":
-
-    # Make a copy of the cohort
-    filtered_df = df.copy()
-
-    # ---------------- FILTERS ----------------
-    # Form Group
-    form_groups = sorted(filtered_df['Form Group'].dropna().unique())
-    selected_form = st.sidebar.multiselect("Form Group", form_groups, default=form_groups)
-
-    # Maths Set
-    if 'Maths Set' in filtered_df.columns:
-        maths_sets = sorted(filtered_df['Maths Set'].dropna().unique())
-        selected_math = st.sidebar.multiselect("Maths Set", maths_sets, default=maths_sets)
-    else:
-        selected_math = []
-
-    # Subject filter
-    subject_columns = [
-        "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama",
-        "Geography","History","Hospitality","Music","Photography","Spanish","Sport"
-    ]
-    available_subjects = [s for s in subject_columns if s in filtered_df.columns]
-    selected_subject = st.sidebar.selectbox("Subject", ["All Subjects"] + available_subjects)
-
-    # ---------------- APPLY FILTERS ----------------
-    if selected_form:
-        filtered_df = filtered_df[filtered_df['Form Group'].isin(selected_form)]
-
-    if selected_math:
-        filtered_df = filtered_df[filtered_df['Maths Set'].isin(selected_math)]
-
-    if selected_subject != "All Subjects":
-        filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
-
-    # ---------------- SAFE CHECK ----------------
-    if filtered_df.empty:
-        st.warning("No students match the selected filters.")
-    else:
-        render_y9_transition(filtered_df)
 
 # ---------------------------
-# ROUTING
+# ROUTING & FILTERS
 # ---------------------------
 if page == "Student Search":
     student_search(df)
 
 elif page == "Year 7 Passports":
-    filtered_df = year7_filters(df)
+    # ------------------ FILTERS ------------------
+    form_groups = sorted(df["Form Group"].dropna().unique())
+    maths_sets = sorted(df["Maths Set"].dropna().unique())
+
+    selected_form = st.sidebar.multiselect(
+        "Form Group", form_groups, default=form_groups, key="y7_form_filter"
+    )
+    selected_math = st.sidebar.multiselect(
+        "Maths Set", maths_sets, default=maths_sets, key="y7_math_filter"
+    )
+
+    filtered_df = df[
+        df["Form Group"].isin(selected_form) & df["Maths Set"].isin(selected_math)
+    ]
+
     render_y7_passports(filtered_df)
 
 elif page == "Year 9 Transition":
-    filtered_df = year9_filters(df)
+    # ------------------ FILTERS ------------------
+    form_groups = sorted(df["Form Group"].dropna().unique())
+    maths_sets = sorted(df["Maths Set"].dropna().unique())
+
+    # Dynamic subject detection based on grade columns
+    grade_cols = [c for c in df.columns if c not in ["Full Name", "Form Group", "Maths Set", "Tutor", "DoB", "Gender", "SEN Status", "Ethnicity", "EAL", "Disadvantaged"]]
+    available_subjects = [c for c in grade_cols if df[c].notna().any()]
+
+    selected_form = st.sidebar.multiselect(
+        "Form Group", form_groups, default=form_groups, key="y9_form_filter"
+    )
+    selected_math = st.sidebar.multiselect(
+        "Maths Set", maths_sets, default=maths_sets, key="y9_math_filter"
+    )
+    selected_subject = st.sidebar.selectbox(
+        "Subject", ["All Subjects"] + available_subjects, key="y9_subject_filter"
+    )
+
+    filtered_df = df[
+        df["Form Group"].isin(selected_form) & df["Maths Set"].isin(selected_math)
+    ]
+
+    if selected_subject != "All Subjects":
+        filtered_df = filtered_df[filtered_df[selected_subject].notna()]
+
     render_y9_transition(filtered_df)
 
 elif page == "Analytics":
     analytics(df)
+    
