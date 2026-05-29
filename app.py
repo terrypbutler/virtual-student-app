@@ -231,7 +231,10 @@ elif page == "Year 7 Passports":
     if selected_math:
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
-    render_y7_passports(filtered_df)
+    show_subs = st.sidebar.checkbox("Include Subject Reports", value=False)
+    
+    for _, row in filtered_df.iterrows():
+        render_student_card(row, "Year 7", show_subjects=show_subs, show_projected=True)
 
 elif page == "Year 9 Transition":
 
@@ -281,7 +284,10 @@ elif page == "Year 9 Transition":
             (filtered_df[selected_subject].astype(str).str.strip() != "")
         ]
 
-    render_y9_transition(filtered_df)
+    is_full_report = st.sidebar.checkbox("Show Full Report (with subjects & projected)", value=False)
+    
+    for _, row in filtered_df.iterrows():
+        render_student_card(row, "Year 9", show_subjects=is_full_report, show_projected=is_full_report)
 
 elif page == "Analytics":
     analytics(df)
