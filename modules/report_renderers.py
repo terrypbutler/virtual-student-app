@@ -1,5 +1,6 @@
 import streamlit as st
 from modules.ui_components import render_student_header, render_student_summary
+from modules.photo_utils import display_student_photo
 
 def render_student_card(row, cohort, show_subjects=False, show_projected=True):
     """
@@ -39,3 +40,28 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True):
                 st.table(available)
             else:
                 st.caption("No subject data available.")
+
+# --- NEW FUNCTION FOR THE GRID ---
+def render_photo_grid(df, cohort, num_cols=5):
+    """
+    Renders a grid of student photos based on the filtered dataframe.
+    """
+    if df.empty:
+        st.warning("No students found for this selection.")
+        return
+
+    # Create the columns for the grid
+    cols = st.columns(num_cols)
+    
+    # Loop through the filtered students and distribute them across the columns
+    for index, (_, row) in enumerate(df.iterrows()):
+        name = row.get("Full Name", "Unknown")
+        
+        # This math ensures photos wrap around to the next row automatically
+        col = cols[index % num_cols]
+        
+        with col:
+            display_student_photo(name, cohort)
+            # Add the name underneath the photo, centered
+            st.markdown(f"<p style='text-align: center; font-weight: bold;'>{name}</p>", unsafe_allow_html=True)
+            st.write("---") # Visual separator between rows
