@@ -45,39 +45,60 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True):
 def render_photo_grid(df, cohort, num_cols=5):
     """
     Renders a strict grid of student photos with key demographic details.
-    Forces horizontal alignment by creating new columns per row.
+    Includes a metrics dashboard at the top for quick cohort analysis.
     """
     if df.empty:
         st.warning("No students found for this selection.")
         return
 
+    # --- 1. CALCULATE COHORT STATS ---
+    sen_count = 0
+    eal_count = 0
+    pp_count = 0
+
+    # Negative words to ignore when counting flags
+    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE"]
+
+    for _, row in df.iterrows():
+        if str(get_field(row, "sen_status")).strip().upper() not in ignore_list:
+            sen_count += 1
+        if str(get_field(row, "eal")).strip().upper() not in ignore_list:
+            eal_count += 1
+        if str(get_field(row, "pp")).strip().upper() not in ignore_list:
+            pp_count += 1
+
+    # --- 2. RENDER METRICS DASHBOARD ---
+    st.markdown("### 📊 Selection Overview")
+    
+    # Create 4 equal columns for the top metrics
+    m1, m2, m3, m4 = st.columns(4)
+    
+    m1.metric("Total Students", len(df))
+    m2.metric("SEN Support", sen_count)
+    m3.metric("EAL", eal_count)
+    m4.metric("Pupil Premium", pp_count)
+
+    st.write("---") # Thick divider before the photos start
+
+    # --- 3. RENDER PHOTO GRID ---
     # Loop through the dataframe in chunks to create strict horizontal rows
     for i in range(0, len(df), num_cols):
-        
-        # Create a fresh set of columns for this specific row
         cols = st.columns(num_cols)
-        
-        # Grab the next batch of students (e.g., 5 at a time)
         row_students = df.iloc[i : i + num_cols]
         
-        # Assign each student to a column strictly within this row
         for col, (_, row) in zip(cols, row_students.iterrows()):
             with col:
                 name = row.get("Full Name", "Unknown")
                 
-                # Safely extract the details using your helper map
                 sen_status = get_field(row, "sen_status")
                 sen_detail = get_field(row, "sen_detail")
                 pp_status = get_field(row, "pp")
                 eal_status = get_field(row, "eal")
                 
-                # Render Photo
                 display_student_photo(name, cohort)
                 
-                # Render Name
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
                 
-                # Render Details
                 details_html = f"""
                 <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.3;'>
                     <strong>SEN:</strong> {sen_status}<br>
@@ -87,5 +108,4 @@ def render_photo_grid(df, cohort, num_cols=5):
                 """
                 st.markdown(details_html, unsafe_allow_html=True)
         
-        # Draw a clean horizontal line across the screen after each full row is complete
         st.write("---")
