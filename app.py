@@ -1,114 +1,122 @@
-# app.py
-
 import streamlit as st
-
-from config import YEAR_7_URL, YEAR_9_URL
+import pandas as pd
 
 from modules.data_loader import load_data
-
 from modules.report_renderers import (
     render_y7_passports,
-    render_subject_report
+    render_subject_report,
+    render_y9_transition,
+    render_y9_full
 )
 
-
-st.set_page_config(
-    page_title="Virtual Student Intake Dashboard",
-    layout="wide"
-)
-
-st.title("🎓 Virtual Student Intake Dashboard")
-
-st.sidebar.header("Navigation")
-
-selected_cohort = st.sidebar.radio(
-    "Select Cohort",
-    ["Year 7", "Year 9"]
-)
-
-view_type = st.sidebar.radio(
-    "Group By",
-    ["Maths Set", "Tutor Group"]
-)
-
-if selected_cohort == "Year 7":
-    df = load_data(YEAR_7_URL)
-else:
-    df = load_data(YEAR_9_URL)
-
-# Search
-search_term = st.sidebar.text_input("Search Student")
-
-if search_term:
-    df = df[
-        df["Full Name"]
-        .astype(str)
-        .str.contains(search_term, case=False)
-    ]
+# Optional analytics import (only used on page)
+import matplotlib.pyplot as plt
 
 
-# Dynamic grouping
-if view_type == "Maths Set":
-    target_column = "Maths Set"
-else:
-    target_column = "Tutor Group"
+# ---------------------------
+# PAGE CONFIG
+# ---------------------------
+st.set_page_config(page_title="Virtual Student MIS", layout="wide")
 
 
-if target_column in df.columns:
-    groups = sorted(df[target_column].dropna().unique())
+# ---------------------------
+# DATA SOURCES
+# ---------------------------
+YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
 
-    selected_group = st.sidebar.selectbox(
-        f"Select {view_type}",
-        groups
-    )
-
-    filtered_df = df[
-        df[target_column] == selected_group
-    ]
-
-else:
-    filtered_df = df
-
-# Dashboard metrics
-metric1, metric2, metric3 = st.columns(3)
-
-metric1.metric(
-    "Students Loaded",
-    len(filtered_df)
-)
-
-metric2.metric(
-    "EAL Students",
-    len(filtered_df[
-        filtered_df.astype(str)
-        .apply(lambda row: row.str.contains("EAL", case=False).any(), axis=1)
-    ])
-)
-
-metric3.metric(
-    "SEN Students",
-    len(filtered_df[
-        filtered_df.astype(str)
-        .apply(lambda row: row.str.contains("SEN", case=False).any(), axis=1)
-    ])
-)
+YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?gid=214766920&single=true&output=csv"
 
 
-st.write("---")
+# ---------------------------
+# LOAD DATA (CACHED IN MODULE)
+# ---------------------------
+selected_cohort = st.sidebar.radio("📅 Cohort", ["Year 7", "Year 9"])
+
+df = load_data(YEAR_7_URL if selected_cohort == "Year 7" else YEAR_9_URL)
 
 
-report_type = st.radio(
-    "Select Report",
+# ---------------------------
+# SIDEBAR NAVIGATION
+# ---------------------------
+st.sidebar.title("🎓 School MIS Dashboard")
+
+page = st.sidebar.radio(
+    "Navigate",
     [
+        "Student Search",
         "Year 7 Passports",
-        "Academic Subject Reports"
-    ],
-    horizontal=True
+        "Year 7 Reports",
+        "Year 9 Transition",
+        "Year 9 Full Reports",
+        "Analytics"
+    ]
 )
 
 
-if report_type == "Year 7 Passports":
-    render_y7_passports(filtered_df)
+# ---------------------------
+# STUDENT SEARCH
+# ---------------------------
+def student_search(df):
+    st.title("🔍 Student Search")
 
-elif report_type == "Academic Subject Reports":
-    render_subject_report(filtered_df)
+    query = st.text_input("Search by student name")
+
+    if query:
+        results = df[df["Full Name"].str.contains(query, case=False, na=False)]
+
+        st.write(f"Found {len(results)} students")
+
+        for _, row in results.iterrows():
+            st.markdown(f"### {row['Full Name']}")
+            st.write(row.to_dict())
+            st.write("---")
+
+
+# ---------------------------
+# ANALYTICS
+# ---------------------------
+def analytics(df):
+    st.title("📊 Cohort Analytics")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if "SEN Status" in df.columns:
+            st.subheader("SEN Distribution")
+            fig, ax = plt.subplots()
+            df["SEN Status"].value_counts().plot(kind="bar", ax=ax)
+            st.pyplot(fig)
+
+    with col2:
+        if "EAL" in df.columns:
+            st.subheader("EAL Distribution")
+            fig, ax = plt.subplots()
+            df["EAL"].value_counts().plot(kind="bar", ax=ax)
+            st.pyplot(fig)
+
+
+# ---------------------------
+# ROUTING SYSTEM
+# ---------------------------
+
+if page == "Student Search":
+    student_search(df)
+
+elif page == "Year 7 Passports":
+    st.title("📄 Year 7 Passports")
+    render_y7_passports(df)
+
+elif page == "Year 7 Reports":
+    st.title("📊 Year 7 Reports")
+    render_subject_report(df)
+
+elif page == "Year 9 Transition":
+    st.title("📁 Year 9 Transition Profiles")
+    render_y9_transition(df)
+
+elif page == "Year 9 Full Reports":
+    st.title("💯 Year 9 Full Reports")
+    render_y9_full(df)
+
+elif page == "Analytics":
+    analytics(df)
