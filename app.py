@@ -10,8 +10,8 @@ st.set_page_config(page_title="Virtual Student MIS", layout="wide")
 # ---------------------------
 # DATA SOURCES (REPLACE THESE)
 # ---------------------------
-YEAR_7_URL = "PASTE_YEAR_7_CSV_URL_HERE"
-YEAR_9_URL = "PASTE_YEAR_9_CSV_URL_HERE"
+YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pubhtml?gid=0&single=true"
+YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pubhtml?gid=214766920&single=true"
 
 COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"]
 
