@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 import os
+from modules.report_renderers import render_student_card, render_photo_grid
 
 def safe_unique(df, col):
     if col in df.columns:
@@ -232,6 +233,18 @@ elif page == "Year 7 Passports":
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
     show_subs = st.sidebar.checkbox("Include Subject Reports", value=False)
+
+    st.subheader(f"Showing {len(filtered_df)} Students")
+    
+    # Create the tabs
+    tab1, tab2 = st.tabs(["📄 Detailed Passports", "📸 Photo Grid"])
+    
+    with tab1:
+        for _, row in filtered_df.iterrows():
+            render_student_card(row, "Year 7", show_subjects=show_subs, show_projected=True)
+            
+    with tab2:
+        render_photo_grid(filtered_df, "Year 7", num_cols=5)
     
     for _, row in filtered_df.iterrows():
         render_student_card(row, "Year 7", show_subjects=show_subs, show_projected=True)
@@ -285,6 +298,18 @@ elif page == "Year 9 Transition":
         ]
 
     is_full_report = st.sidebar.checkbox("Show Full Report (with subjects & projected)", value=False)
+
+    st.subheader(f"Showing {len(filtered_df)} Students")
+    
+    # Create the tabs
+    tab1, tab2 = st.tabs(["📄 Detailed Passports", "📸 Photo Grid"])
+    
+    with tab1:
+        for _, row in filtered_df.iterrows():
+            render_student_card(row, "Year 9", show_subjects=is_full_report, show_projected=is_full_report)
+            
+    with tab2:
+        render_photo_grid(filtered_df, "Year 9", num_cols=5)
     
     for _, row in filtered_df.iterrows():
         render_student_card(row, "Year 9", show_subjects=is_full_report, show_projected=is_full_report)
