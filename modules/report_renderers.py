@@ -121,11 +121,12 @@ def render_photo_grid(df, cohort, num_cols=5):
                 else:
                     eal_html = f"EAL: {eal_status}"
                 
-                # Combine into final HTML block
+# Combine into final HTML block
                 details_html = f"""
                 <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.4; padding-bottom: 10px;'>
                     {sen_html}<br>
-                    {pp_html} | {eal_html}
+                    {pp_html}<br>
+                    {eal_html}
                 </div>
                 """
                 st.markdown(details_html, unsafe_allow_html=True)
