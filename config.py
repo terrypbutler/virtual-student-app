@@ -49,7 +49,7 @@ FIELD_MAP = {
 
     "pp": [
         "Premium",
-        "Disadvantaged",
+        "Disadvantaged (PP)",
         "Pupil Premium"
     ],
 
