@@ -181,75 +181,80 @@ if page == "Student Search":
     
 elif page == "Year 7 Passports":
 
-    form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
-    maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
+    st.sidebar.subheader("🔎 Filters (Year 7)")
+
+    form_groups = safe_unique(df, "Form Group")
+    maths_sets = safe_unique(df, "Maths Set")
 
     selected_form = st.sidebar.multiselect(
-        "Form Group (leave blank for ALL)",
+        "Form Group (ALL by default)",
         form_groups,
-        key="y7_form_filter"
+        key="y7_form"
     )
 
     selected_math = st.sidebar.multiselect(
-        "Maths Set (leave blank for ALL)",
+        "Maths Set (ALL by default)",
         maths_sets,
-        key="y7_math_filter"
+        key="y7_math"
     )
 
     filtered_df = df.copy()
 
     if selected_form:
-        filtered_df = filtered_df[filtered_df["Form Group"].isin(selected_form)]
+        filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
 
     if selected_math:
-        filtered_df = filtered_df[filtered_df["Maths Set"].isin(selected_math)]
+        filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
     render_y7_passports(filtered_df)
 
 elif page == "Year 9 Transition":
-    # ------------------ FILTERS ------------------
-    form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
-    maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
 
-selected_form = st.sidebar.multiselect(
-    "Form Group (leave blank for ALL)",
-    form_groups,
-    key="y9_form_filter"
-)
+    st.sidebar.subheader("🔎 Filters (Year 9)")
 
-selected_math = st.sidebar.multiselect(
-    "Maths Set (leave blank for ALL)",
-    maths_sets,
-    key="y9_math_filter"
-)
+    form_groups = safe_unique(df, "Form Group")
+    maths_sets = safe_unique(df, "Maths Set")
 
-# Subject filter (still optional, but ALL by default)
-subject_columns = [
-    "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama",
-    "Geography","History","Hospitality","Music","Photography","Spanish","Sport"
-]
+    selected_form = st.sidebar.multiselect(
+        "Form Group (ALL by default)",
+        form_groups,
+        key="y9_form"
+    )
 
-available_subjects = [c for c in subject_columns if c in df.columns]
+    selected_math = st.sidebar.multiselect(
+        "Maths Set (ALL by default)",
+        maths_sets,
+        key="y9_math"
+    )
 
-selected_subject = st.sidebar.selectbox(
-    "Subject (optional)",
-    ["All Subjects"] + available_subjects,
-    key="y9_subject_filter"
-)
-
-filtered_df = df.copy()
-
-if selected_form:
-    filtered_df = filtered_df[filtered_df["Form Group"].isin(selected_form)]
-
-if selected_math:
-    filtered_df = filtered_df[filtered_df["Maths Set"].isin(selected_math)]
-
-if selected_subject != "All Subjects":
-    filtered_df = filtered_df[
-        filtered_df[selected_subject].notna() &
-        (filtered_df[selected_subject].astype(str).str.strip() != "")
+    # subject dropdown (optional)
+    subject_cols = [
+        "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design",
+        "Drama","Geography","History","Hospitality","Music","Photography",
+        "Spanish","Sport"
     ]
+
+    available_subjects = [c for c in subject_cols if c in df.columns]
+
+    selected_subject = st.sidebar.selectbox(
+        "Subject (optional)",
+        ["All Subjects"] + available_subjects,
+        key="y9_subject"
+    )
+
+    filtered_df = df.copy()
+
+    if selected_form:
+        filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
+
+    if selected_math:
+        filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
+
+    if selected_subject != "All Subjects":
+        filtered_df = filtered_df[
+            filtered_df[selected_subject].notna() &
+            (filtered_df[selected_subject].astype(str).str.strip() != "")
+        ]
 
     render_y9_transition(filtered_df)
 
