@@ -1,4 +1,3 @@
-```python id="s91z8x"
 import pandas as pd
 import streamlit as st
 
