@@ -3,6 +3,11 @@ import pandas as pd
 from PIL import Image
 import os
 
+def safe_unique(df, col):
+    if col in df.columns:
+        return sorted(df[col].dropna().astype(str).unique().tolist())
+    return []
+
 from modules.data_loader import load_data
 from modules.report_renderers import render_y7_passports, render_y9_transition
 
