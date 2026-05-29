@@ -1,10 +1,12 @@
 import streamlit as st
-
 from modules.helpers import get_field
 from modules.photo_utils import display_student_photo
 
 
 def render_student_summary(row):
+    """
+    Render the main summary table for a student.
+    """
     summary = {
         "Form Group": get_field(row, "form_group"),
         "Gender": get_field(row, "gender"),
@@ -18,7 +20,6 @@ def render_student_summary(row):
     }
 
     col1, col2 = st.columns(2)
-
     items = list(summary.items())
 
     for i, (key, value) in enumerate(items):
@@ -27,6 +28,10 @@ def render_student_summary(row):
 
 
 def render_student_header(row, title, cohort="Year 7"):
+    """
+    Render the header section including name, DoB, and student photo.
+    Left/right cropping handled automatically in photo_utils.
+    """
     name = row.get("Full Name", "Unknown Student")
     dob = row.get("DoB", "")
 
