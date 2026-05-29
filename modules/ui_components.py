@@ -1,8 +1,7 @@
-# modules/ui_components.py
-
 import streamlit as st
 
 from modules.helpers import get_field
+from modules.photo_utils import display_student_photo
 
 
 def render_student_summary(row):
@@ -27,8 +26,7 @@ def render_student_summary(row):
         target.markdown(f"**{key}:** {value}")
 
 
-
-def render_student_header(row, title):
+def render_student_header(row, title, cohort="Year 7"):
     name = row.get("Full Name", "Unknown Student")
     dob = row.get("DoB", "")
 
@@ -41,5 +39,4 @@ def render_student_header(row, title):
             st.markdown(f"### {title}: {name}")
 
     with right:
-        from modules.photo_utils import display_student_photo
-        display_student_photo(name)
+        display_student_photo(name, cohort)
