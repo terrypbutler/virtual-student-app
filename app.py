@@ -10,7 +10,33 @@ def safe_unique(df, col):
 
 from modules.data_loader import load_data
 from modules.report_renderers import render_y7_passports, render_y9_transition
+# --------------------------- SAFE IMAGE LOADER ---------------------------
+import os
+from PIL import Image
 
+def load_student_image(name, cohort):
+    folder = "photos"
+
+    if not os.path.exists(folder):
+        return None
+
+    safe_name = str(name).strip().lower()
+    safe_name = " ".join(safe_name.split())  # removes double spaces
+    safe_name = safe_name.replace(".", "")
+
+    expected_file = f"{safe_name}.png"
+
+    files = {f.lower(): f for f in os.listdir(folder)}
+
+    if expected_file not in files:
+        return None
+
+    path = os.path.join(folder, files[expected_file])
+
+    try:
+        return Image.open(path)
+    except:
+        return None
 # ---------------------------
 # CONFIG
 # ---------------------------
