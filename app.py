@@ -149,17 +149,7 @@ def year7_filters(df):
 
     return df[filter_conditions]
 
-# Optional Next Enhancements for the Virtual Student MIS
-
-Potential future upgrades:
-
-* Add dynamic subject-option filters based on all grade columns automatically
-
-## Code Block for app.py
-
-Replace your current `year9_filters()` function with this upgraded version:
-
-```python
+```
 # ---------------------------
 # DYNAMIC YEAR 9 FILTERS
 # ---------------------------
