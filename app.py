@@ -149,32 +149,113 @@ def year7_filters(df):
 
     return df[filter_conditions]
 
+# Optional Next Enhancements for the Virtual Student MIS
+
+Potential future upgrades:
+
+* Add dynamic subject-option filters based on all grade columns automatically
+
+## Code Block for app.py
+
+Replace your current `year9_filters()` function with this upgraded version:
+
+```python
 # ---------------------------
-# FILTERS FOR YEAR 9
+# DYNAMIC YEAR 9 FILTERS
 # ---------------------------
 def year9_filters(df):
     st.sidebar.subheader("Filter Year 9")
-    maths_col = "Maths Set" if "Maths Set" in df.columns else None
-    form_col = "Form Group" if "Form Group" in df.columns else None
-    option_col = next((c for c in df.columns if c.startswith("Option")), None)
-    filter_conditions = pd.Series([True] * len(df))
 
+    filter_conditions = pd.Series([True] * len(df), index=df.index)
+
+    # ---------------- Maths Set ----------------
+    maths_col = "Maths Set" if "Maths Set" in df.columns else None
     if maths_col:
-        selected_math = st.sidebar.multiselect("Maths Set", sorted(df[maths_col].dropna().unique()))
+        selected_math = st.sidebar.multiselect(
+            "Maths Set",
+            sorted(df[maths_col].dropna().astype(str).unique())
+        )
+
         if selected_math:
-            filter_conditions &= df[maths_col].isin(selected_math)
+            filter_conditions &= df[maths_col].astype(str).isin(selected_math)
+
+    # ---------------- Form Group ----------------
+    form_col = None
+
+    for possible in ["Form Group", "Tutor Group", "Form Tutor", "Tutor"]:
+        if possible in df.columns:
+            form_col = possible
+            break
 
     if form_col:
-        selected_form = st.sidebar.multiselect("Form Group", sorted(df[form_col].dropna().unique()))
-        if selected_form:
-            filter_conditions &= df[form_col].isin(selected_form)
+        selected_form = st.sidebar.multiselect(
+            "Form Group",
+            sorted(df[form_col].dropna().astype(str).unique())
+        )
 
-    if option_col:
-        selected_option = st.sidebar.multiselect(f"{option_col} Grade", sorted(df[option_col].dropna().unique()))
-        if selected_option:
-            filter_conditions &= df[option_col].isin(selected_option)
+        if selected_form:
+            filter_conditions &= df[form_col].astype(str).isin(selected_form)
+
+    # ---------------- Dynamic Subject Filters ----------------
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📚 Subject Filters")
+
+    subject_keywords = [
+        "grade",
+        "english",
+        "maths",
+        "science",
+        "history",
+        "geography",
+        "art",
+        "music",
+        "drama",
+        "pe",
+        "computer",
+        "option"
+    ]
+
+    ignored_columns = [
+        "Current Grade",
+        "Target Grade"
+    ]
+
+    subject_columns = []
+
+    for col in df.columns:
+        col_lower = col.lower()
+
+        if col in ignored_columns:
+            continue
+
+        if any(keyword in col_lower for keyword in subject_keywords):
+            unique_vals = df[col].dropna().astype(str).unique()
+
+            # only create filter if actual grade-style data exists
+            if len(unique_vals) > 1 and len(unique_vals) < 30:
+                subject_columns.append(col)
+
+    for subject_col in sorted(subject_columns):
+
+        options = sorted(
+            [
+                x for x in df[subject_col]
+                .dropna()
+                .astype(str)
+                .unique()
+                if x.strip() != ""
+            ]
+        )
+
+        if options:
+            selected = st.sidebar.multiselect(subject_col, options)
+
+            if selected:
+                filter_conditions &= df[subject_col].astype(str).isin(selected)
 
     return df[filter_conditions]
+``'
+
 
 # ---------------------------
 # ANALYTICS
