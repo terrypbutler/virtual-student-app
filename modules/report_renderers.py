@@ -60,26 +60,67 @@ else:
 # ---------------------------
 # BASE PASSPORT LAYOUT
 # ---------------------------
-def render_passport(row, cohort, title="Student Passport"):
-    NAME = "Full Name"
-    DOB = "DoB"
+def render_student_passport(student_row, cohort):
+    """
+    Render a MIS-style student passport with photo and details.
+    """
+    import os
+    from PIL import Image
+    import streamlit as st
 
-    name = str(row.get(NAME, "Unknown Student"))
-    dob = str(row.get(DOB, "")).strip()
+    NAME_COLUMN = "Full Name"
+    DOB_COLUMN = "DoB"
 
-    header = f"{name} ({dob})" if dob else name
+    # Get student name and DoB
+    s_name = str(student_row.get(NAME_COLUMN, "Unknown Student"))
+    s_dob = str(student_row.get(DOB_COLUMN, "")).strip()
+    header = f"{s_name} ({s_dob})" if s_dob else s_name
 
     with st.expander(f"👤 {header}"):
+        left, right = st.columns([1, 2])
 
-        left, right = st.columns([3, 1])
+        # ---------------- LEFT COLUMN: PHOTO ----------------
+        def load_student_image(name, cohort):
+            """Safely load and crop student image."""
+            try:
+                safe_name = name.strip().replace(".", "").lower()
+                filename = f"{safe_name}.png"
+                photo_folder = "photos"
+                if not os.path.exists(photo_folder):
+                    return None
 
-        with left:
-            st.markdown(f"### **{title}: {header}**")
+                files = {f.lower(): f for f in os.listdir(photo_folder)}
+                if filename not in files:
+                    return None
 
-        with right:
-            render_photo(name, cohort)
+                img = Image.open(os.path.join(photo_folder, files[filename]))
+                w, h = img.size
+                trim = int(h * 0.08)
+                top = trim
+                bottom = h - trim
 
-        # ---------------- CORE DATA BLOCK ----------------
+                if cohort == "Year 7":
+                    crop = (0, top, w // 2, bottom)      # left half
+                else:
+                    crop = (w // 2, top, w, bottom)      # right half
+
+                return img.crop(crop)
+            except:
+                return None
+
+        img = load_student_image(s_name, cohort)
+        if img:
+            left.image(img, width=140, caption=s_name)
+        else:
+            left.info("📷 No photo found")
+
+        # ---------------- RIGHT COLUMN: DETAILS ----------------
+        def get_val(keys):
+            for k in keys:
+                if k in student_row and str(student_row[k]).strip():
+                    return student_row[k]
+            return "N/A"
+
         info = {
             "Form Group": ["Form Tutor", "Tutor", "Form Group"],
             "Gender": ["Gender"],
@@ -92,21 +133,35 @@ def render_passport(row, cohort, title="Student Passport"):
             "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
         }
 
-        table_html = "<table style='width:100%; border-collapse: collapse;'>"
+        # ----------------- Styled card -----------------
+        card_style = """
+        <style>
+        .passport-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            background-color: #f9f9f9;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+        }
+        .passport-card td {
+            padding: 6px 8px;
+        }
+        </style>
+        """
+        st.markdown(card_style, unsafe_allow_html=True)
 
+        table_html = "<div class='passport-card'><table style='width:100%; border-collapse: collapse;'>"
         for label, keys in info.items():
             table_html += f"""
             <tr>
-                <td style='border:1px solid #ddd; padding:8px;'>
-                    <strong>{label}:</strong> {get_val(row, keys)}
+                <td style='border-bottom:1px solid #eee;'>
+                    <strong>{label}:</strong> {get_val(keys)}
                 </td>
             </tr>
             """
+        table_html += "</table></div>"
 
-        table_html += "</table>"
-
-        st.markdown(table_html, unsafe_allow_html=True)
-
+        right.markdown(table_html, unsafe_allow_html=True)
 
 # ---------------------------
 # YEAR 7 PASSPORTS
