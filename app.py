@@ -9,7 +9,7 @@ def safe_unique(df, col):
     return []
 
 from modules.data_loader import load_data
-from modules.report_renderers import render_y7_passports, render_y9_transition
+from modules.report_renderers import render_y7_passports, render_y9_transition, render_student_passport
 # --------------------------- SAFE IMAGE LOADER ---------------------------
 import os
 from PIL import Image
