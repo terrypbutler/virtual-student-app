@@ -18,13 +18,13 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True):
         # 2. Summary Table (from ui_components)
         render_student_summary(row)
         
-        # 3. Projected Grades (Toggleable)
+        # 3. Projected Grades
         if show_projected:
             proj = str(row.get("Projected Grade", "")).strip()
             if proj and proj.lower() != "nan":
                 st.info(f"**Projected Grade:** {proj}")
                 
-        # 4. Subject Reports (Toggleable)
+        # 4. Subject Reports
         if show_subjects:
             st.subheader("Subject Reports")
             subject_cols = [
@@ -41,6 +41,7 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True):
                 st.table(available)
             else:
                 st.caption("No subject data available.")
+
 
 def render_photo_grid(df, cohort, num_cols=5):
     """
@@ -102,19 +103,16 @@ def render_photo_grid(df, cohort, num_cols=5):
                 # Render Photo and Name
                 display_student_photo(name, cohort)
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
-            
                 
-# --- DYNAMIC LABEL BUILDER ---
+                # --- DYNAMIC LABEL BUILDER ---
                 active_labels = []
                 
                 if sen_active:
                     # Only append the brackets if a detail actually exists
                     detail_str = f" ({sen_detail})" if sen_detail.upper() not in ignore_list else ""
-                    # Removed the "SEN: " prefix here:
                     active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}{detail_str}</span>")
                     
-               if pp_active:
-                    # Just print "PP" in bold blue instead of the underlying status
+                if pp_active:
                     active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
                     
                 if eal_active:
