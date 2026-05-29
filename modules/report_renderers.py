@@ -46,6 +46,7 @@ def render_photo_grid(df, cohort, num_cols=5):
     """
     Renders a strict grid of student photos with key demographic details.
     Includes a metrics dashboard and conditional color-coding for SEN/PP/EAL.
+    Completely hides inactive/blank labels.
     """
     if df.empty:
         st.warning("No students found for this selection.")
@@ -88,47 +89,42 @@ def render_photo_grid(df, cohort, num_cols=5):
                 name = row.get("Full Name", "Unknown")
                 
                 # Extract raw values
-                sen_status = get_field(row, "sen_status")
-                sen_detail = get_field(row, "sen_detail")
-                pp_status = get_field(row, "pp")
-                eal_status = get_field(row, "eal")
+                sen_status = str(get_field(row, "sen_status")).strip()
+                sen_detail = str(get_field(row, "sen_detail")).strip()
+                pp_status = str(get_field(row, "pp")).strip()
+                eal_status = str(get_field(row, "eal")).strip()
                 
                 # Check if flags are active
-                sen_active = str(sen_status).strip().upper() not in ignore_list
-                pp_active = str(pp_status).strip().upper() not in ignore_list
-                eal_active = str(eal_status).strip().upper() not in ignore_list
+                sen_active = sen_status.upper() not in ignore_list
+                pp_active = pp_status.upper() not in ignore_list
+                eal_active = eal_status.upper() not in ignore_list
                 
                 # Render Photo and Name
                 display_student_photo(name, cohort)
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
                 
-                # --- CONDITIONAL COLOR FORMATTING ---
-                # SEN logic: Red, Bold, include detail if active
-                if sen_active:
-                    sen_html = f"<span style='color: #D32F2F; font-weight: bold;'>SEN: {sen_status} ({sen_detail})</span>"
-                else:
-                    sen_html = f"SEN: {sen_status}"
-                    
-                # PP logic: Blue if active
-                if pp_active:
-                    pp_html = f"<span style='color: #1976D2; font-weight: bold;'>PP: {pp_status}</span>"
-                else:
-                    pp_html = f"PP: {pp_status}"
-                    
-                # EAL logic: Green if active
-                if eal_active:
-                    eal_html = f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>"
-                else:
-                    eal_html = f"EAL: {eal_status}"
+                # --- DYNAMIC LABEL BUILDER ---
+                active_labels = []
                 
-# Combine into final HTML block
-                details_html = f"""
-                <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.4; padding-bottom: 10px;'>
-                    {sen_html}<br>
-                    {pp_html}<br>
-                    {eal_html}
-                </div>
-                """
-                st.markdown(details_html, unsafe_allow_html=True)
+                if sen_active:
+                    # Only append the brackets if a detail actually exists
+                    detail_str = f" ({sen_detail})" if sen_detail.upper() not in ignore_list else ""
+                    active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>SEN: {sen_status}{detail_str}</span>")
+                    
+                if pp_active:
+                    active_labels.append(f"<span style='color: #1976D2; font-weight: bold;'>PP: {pp_status}</span>")
+                    
+                if eal_active:
+                    active_labels.append(f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>")
+                
+                # Only render the HTML block if there is at least one active label to show
+                if active_labels:
+                    labels_combined = "<br>".join(active_labels)
+                    details_html = f"""
+                    <div style='text-align: center; font-size: 0.8em; line-height: 1.4; padding-bottom: 10px;'>
+                        {labels_combined}
+                    </div>
+                    """
+                    st.markdown(details_html, unsafe_allow_html=True)
         
         st.write("---")
