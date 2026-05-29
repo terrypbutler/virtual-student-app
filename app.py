@@ -149,7 +149,7 @@ def year7_filters(df):
 
     return df[filter_conditions]
 
-```
+
 # ---------------------------
 # DYNAMIC YEAR 9 FILTERS
 # ---------------------------
