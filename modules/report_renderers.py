@@ -46,7 +46,12 @@ def render_photo(student_name, cohort):
             crop = (w // 2, top, w, bottom)   # right side
 
         img = img.crop(crop)
-        st.image(img, width=220)
+        img = load_student_image(row.get("Full Name", ""), selected_cohort)
+
+if img:
+    st.image(img, width=140)
+else:
+    st.caption("📷 No photo found")
 
     except Exception:
         st.caption("*(Image error)*")
