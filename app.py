@@ -176,31 +176,33 @@ def analytics(df):
 if page == "Student Search":
     student_search(df)
 
-elif page == "Year 7 Passports":
+
     # ------------------ FILTERS ------------------
     
-form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
-maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
+elif page == "Year 7 Passports":
 
-selected_form = st.sidebar.multiselect(
-    "Form Group (leave blank for ALL)",
-    form_groups,
-    key="y7_form_filter"
-)
+    form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
+    maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
 
-selected_math = st.sidebar.multiselect(
-    "Maths Set (leave blank for ALL)",
-    maths_sets,
-    key="y7_math_filter"
-)
+    selected_form = st.sidebar.multiselect(
+        "Form Group (leave blank for ALL)",
+        form_groups,
+        key="y7_form_filter"
+    )
 
-filtered_df = df.copy()
+    selected_math = st.sidebar.multiselect(
+        "Maths Set (leave blank for ALL)",
+        maths_sets,
+        key="y7_math_filter"
+    )
 
-if selected_form:
-    filtered_df = filtered_df[filtered_df["Form Group"].isin(selected_form)]
+    filtered_df = df.copy()
 
-if selected_math:
-    filtered_df = filtered_df[filtered_df["Maths Set"].isin(selected_math)]
+    if selected_form:
+        filtered_df = filtered_df[filtered_df["Form Group"].isin(selected_form)]
+
+    if selected_math:
+        filtered_df = filtered_df[filtered_df["Maths Set"].isin(selected_math)]
 
     render_y7_passports(filtered_df)
 
