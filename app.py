@@ -45,6 +45,10 @@ page = st.sidebar.radio(
 # STUDENT PASSPORT RENDERER
 # ---------------------------
 def render_student_passport(student_row, cohort):
+    import streamlit as st
+    import os
+    from PIL import Image
+
     NAME_COLUMN = "Full Name"
     DOB_COLUMN = "DoB"
 
@@ -54,96 +58,69 @@ def render_student_passport(student_row, cohort):
 
     with st.expander(f"👤 {header}"):
 
-        # ---------------- DETAILS ----------------
-        def get_val(keys):
-            for k in keys:
-                if k in student_row and str(student_row[k]).strip():
-                    return student_row[k]
-            return "N/A"
+        left, right = st.columns([3, 1])
 
-        info = {
-            "Form Group": ["Form Tutor", "Tutor", "Form Group"],
-            "Gender": ["Gender"],
-            "SEN Status": ["SEN Status", "SEND Status"],
-            "SEN Detail": ["SEN detail", "SEND detail"],
-            "Ethnicity": ["Ethnicity"],
-            "EAL": ["EAL", "EAL Status"],
-            "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium"],
-            "SATs Reading": ["SATs Reading", "SAT's Reading", "Reading Score"],
-            "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
-        }
+        # ---------------- LEFT (DETAILS) ----------------
+        with left:
 
-        form_val = get_val(info["Form Group"])
-        gender_val = get_val(info["Gender"])
-        sen_status_val = get_val(info["SEN Status"])
-        sen_detail_val = get_val(info["SEN Detail"])
-        eth_val = get_val(info["Ethnicity"])
-        eal_val = get_val(info["EAL"])
-        dis_val = get_val(info["Disadvantaged"])
-        read_val = get_val(info["SATs Reading"])
-        math_val = get_val(info["SATs Maths"])
+            def get_val(keys):
+                for k in keys:
+                    if k in student_row and str(student_row[k]).strip():
+                        return student_row[k]
+                return "N/A"
 
-        # ---------------- PHOTO ----------------
-        photo_html = ""
-        photo_folder = "photos"
-        if os.path.exists(photo_folder):
-            try:
-                safe_name = s_name.strip().replace(".", "").lower()
-                filename = f"{safe_name}.png"
-                files = {f.lower(): f for f in os.listdir(photo_folder)}
-                if filename in files:
-                    img_path = os.path.join(photo_folder, files[filename])
-                    img = Image.open(img_path)
-                    w, h = img.size
-                    trim = int(h * 0.08)
-                    top = trim
-                    bottom = h - trim
-                    if cohort == "Year 7":
-                        crop = (0, top, w // 2, bottom)
+            info = {
+                "Form Group": ["Form Tutor", "Tutor", "Form Group"],
+                "Gender": ["Gender"],
+                "SEN Status": ["SEN Status", "SEND Status"],
+                "SEN Detail": ["SEN detail", "SEND detail"],
+                "Ethnicity": ["Ethnicity"],
+                "EAL": ["EAL", "EAL Status"],
+                "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium"],
+                "SATs Reading": ["SATs Reading", "SAT's Reading", "Reading Score"],
+                "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
+            }
+
+            cols = st.columns(2)
+
+            items = list(info.items())
+            for i, (label, keys) in enumerate(items):
+                value = get_val(keys)
+                cols[i % 2].metric(label, value)
+
+        # ---------------- RIGHT (PHOTO) ----------------
+        with right:
+            photo_folder = "photos"
+
+            if os.path.exists(photo_folder):
+                try:
+                    safe_name = s_name.strip().replace(".", "").lower()
+                    filename = f"{safe_name}.png"
+
+                    files = {f.lower(): f for f in os.listdir(photo_folder)}
+
+                    if filename in files:
+                        img = Image.open(os.path.join(photo_folder, files[filename]))
+                        w, h = img.size
+
+                        trim = int(h * 0.08)
+                        top = trim
+                        bottom = h - trim
+
+                        if cohort == "Year 7":
+                            crop = (0, top, w // 2, bottom)
+                        else:
+                            crop = (w // 2, top, w, bottom)
+
+                        img = img.crop(crop)
+                        st.image(img, width=140)
                     else:
-                        crop = (w // 2, top, w, bottom)
-                    img = img.crop(crop)
-                    img.save("temp_passport.png")  # temporary file for HTML display
-                    photo_html = f'<img src="temp_passport.png" width="120" style="border-radius: 8px; float:right; margin-left:15px;">'
-            except:
-                photo_html = '<div style="float:right; margin-left:15px;">*(Image error)*</div>'
-        else:
-            photo_html = '<div style="float:right; margin-left:15px;">*(No photo folder)*</div>'
+                        st.caption("Photo missing")
 
-        # ---------------- CARD HTML ----------------
-        st.markdown(
-            f"""
-            <div style="
-                background-color: #ffffff;
-                border-radius: 12px;
-                padding: 16px;
-                border: 1px solid #e6e6e6;
-                box-shadow: 0 1px 6px rgba(0,0,0,0.08);
-                font-family: Arial;
-                position: relative;
-                overflow: hidden;
-            ">
-                {photo_html}
-                <h3 style="margin-top:0;">{header}</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div><b>Form Group:</b><br>{form_val}</div>
-                    <div><b>Gender:</b><br>{gender_val}</div>
-                    <div><b>SEN Status:</b><br>{sen_status_val}</div>
-                    <div><b>SEN Detail:</b><br>{sen_detail_val}</div>
-                    <div><b>Ethnicity:</b><br>{eth_val}</div>
-                    <div><b>EAL:</b><br>{eal_val}</div>
-                    <div style="grid-column: span 2;"><b>Disadvantaged:</b><br>{dis_val}</div>
-                    <div><b>SATs Reading:</b><br>{read_val}</div>
-                    <div><b>SATs Maths:</b><br>{math_val}</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown(table_html, unsafe_allow_html=True)
-
-
+                except:
+                    st.caption("Image error")
+            else:
+                st.caption("No photo folder")
 # ---------------------------
 # SEARCH PAGE
 # ---------------------------
