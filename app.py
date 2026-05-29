@@ -178,47 +178,75 @@ if page == "Student Search":
 
 elif page == "Year 7 Passports":
     # ------------------ FILTERS ------------------
-    form_groups = sorted(df["Form Group"].dropna().unique())
-    maths_sets = sorted(df["Maths Set"].dropna().unique())
+form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
+maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
 
-    selected_form = st.sidebar.multiselect(
-        "Form Group", form_groups, default=form_groups, key="y7_form_filter"
-    )
-    selected_math = st.sidebar.multiselect(
-        "Maths Set", maths_sets, default=maths_sets, key="y7_math_filter"
-    )
+selected_form = st.sidebar.multiselect(
+    "Form Group (leave blank for ALL)",
+    form_groups,
+    key="y7_form_filter"
+)
 
-    filtered_df = df[
-        df["Form Group"].isin(selected_form) & df["Maths Set"].isin(selected_math)
-    ]
+selected_math = st.sidebar.multiselect(
+    "Maths Set (leave blank for ALL)",
+    maths_sets,
+    key="y7_math_filter"
+)
+
+filtered_df = df.copy()
+
+if selected_form:
+    filtered_df = filtered_df[filtered_df["Form Group"].isin(selected_form)]
+
+if selected_math:
+    filtered_df = filtered_df[filtered_df["Maths Set"].isin(selected_math)]
 
     render_y7_passports(filtered_df)
 
 elif page == "Year 9 Transition":
     # ------------------ FILTERS ------------------
-    form_groups = sorted(df["Form Group"].dropna().unique())
-    maths_sets = sorted(df["Maths Set"].dropna().unique())
+form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
+maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
 
-    # Dynamic subject detection based on grade columns
-    grade_cols = [c for c in df.columns if c not in ["Full Name", "Form Group", "Maths Set", "Tutor", "DoB", "Gender", "SEN Status", "Ethnicity", "EAL", "Disadvantaged"]]
-    available_subjects = [c for c in grade_cols if df[c].notna().any()]
+selected_form = st.sidebar.multiselect(
+    "Form Group (leave blank for ALL)",
+    form_groups,
+    key="y9_form_filter"
+)
 
-    selected_form = st.sidebar.multiselect(
-        "Form Group", form_groups, default=form_groups, key="y9_form_filter"
-    )
-    selected_math = st.sidebar.multiselect(
-        "Maths Set", maths_sets, default=maths_sets, key="y9_math_filter"
-    )
-    selected_subject = st.sidebar.selectbox(
-        "Subject", ["All Subjects"] + available_subjects, key="y9_subject_filter"
-    )
+selected_math = st.sidebar.multiselect(
+    "Maths Set (leave blank for ALL)",
+    maths_sets,
+    key="y9_math_filter"
+)
 
-    filtered_df = df[
-        df["Form Group"].isin(selected_form) & df["Maths Set"].isin(selected_math)
+# Subject filter (still optional, but ALL by default)
+subject_columns = [
+    "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama",
+    "Geography","History","Hospitality","Music","Photography","Spanish","Sport"
+]
+
+available_subjects = [c for c in subject_columns if c in df.columns]
+
+selected_subject = st.sidebar.selectbox(
+    "Subject (optional)",
+    ["All Subjects"] + available_subjects,
+    key="y9_subject_filter"
+)
+
+filtered_df = df.copy()
+
+if selected_form:
+    filtered_df = filtered_df[filtered_df["Form Group"].isin(selected_form)]
+
+if selected_math:
+    filtered_df = filtered_df[filtered_df["Maths Set"].isin(selected_math)]
+
+if selected_subject != "All Subjects":
+    filtered_df = filtered_df[
+        filtered_df[selected_subject].notna() &
+        (filtered_df[selected_subject].astype(str).str.strip() != "")
     ]
-
-    if selected_subject != "All Subjects":
-        filtered_df = filtered_df[filtered_df[selected_subject].notna()]
 
     render_y9_transition(filtered_df)
 
