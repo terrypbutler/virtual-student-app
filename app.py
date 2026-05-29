@@ -208,8 +208,8 @@ elif page == "Year 7 Passports":
 
 elif page == "Year 9 Transition":
     # ------------------ FILTERS ------------------
-form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
-maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
+    form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
+    maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
 
 selected_form = st.sidebar.multiselect(
     "Form Group (leave blank for ALL)",
