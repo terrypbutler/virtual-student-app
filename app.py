@@ -94,7 +94,79 @@ def analytics(df):
             df["EAL"].value_counts().plot(kind="bar", ax=ax)
             st.pyplot(fig)
 
+def analytics(df):
+    st.title("📊 Cohort Analytics Dashboard")
 
+    st.markdown("Visualize your cohort: SEN, EAL, Disadvantaged, and Academic Performance.")
+
+    # Make sure necessary columns exist
+    sen_col = "SEN Status" if "SEN Status" in df.columns else None
+    eal_col = "EAL" if "EAL" in df.columns else None
+    pp_col = None
+    for c in ["Pupil Premium", "Disadvantaged (PP)", "Premium"]:
+        if c in df.columns:
+            pp_col = c
+            break
+    maths_col = None
+    for c in ["SATs Maths", "SAT's Maths", "Maths Score"]:
+        if c in df.columns:
+            maths_col = c
+            break
+    tutor_col = None
+    for c in ["Tutor Group", "Form Group", "Form Tutor"]:
+        if c in df.columns:
+            tutor_col = c
+            break
+
+    # -------------------------------
+    # 1️⃣ Stacked Bar: SEN / EAL / PP
+    # -------------------------------
+    st.subheader("🔹 SEN / EAL / Disadvantaged (PP) Distribution")
+
+    if sen_col or eal_col or pp_col:
+        stacked_df = pd.DataFrame()
+
+        if sen_col:
+            stacked_df["SEN"] = df[sen_col].fillna("None").map(lambda x: 1 if x not in ["", "None", "No"] else 0)
+        if eal_col:
+            stacked_df["EAL"] = df[eal_col].fillna("No").map(lambda x: 1 if x not in ["", "No"] else 0)
+        if pp_col:
+            stacked_df["PP"] = df[pp_col].fillna("No").map(lambda x: 1 if x not in ["", "No"] else 0)
+
+        st.bar_chart(stacked_df.sum())
+
+    else:
+        st.info("SEN, EAL or Pupil Premium columns not found in this dataset.")
+
+    st.write("---")
+
+    # -------------------------------
+    # 2️⃣ Maths Grade Distribution Histogram
+    # -------------------------------
+    if maths_col:
+        st.subheader("🔹 Maths Grade Distribution")
+        grades = df[maths_col].dropna().astype(str)
+
+        # convert grades to numeric if possible, else use string counts
+        try:
+            grades_numeric = pd.to_numeric(grades, errors="coerce").dropna()
+            st.bar_chart(grades_numeric.value_counts().sort_index())
+        except:
+            st.bar_chart(grades.value_counts().sort_index())
+    else:
+        st.info("Maths grade column not found in this dataset.")
+
+    st.write("---")
+
+    # -------------------------------
+    # 3️⃣ Tutor Group Comparison
+    # -------------------------------
+    if tutor_col and maths_col:
+        st.subheader("🔹 Maths Performance by Tutor Group")
+        tutor_perf = df.groupby(tutor_col)[maths_col].apply(lambda x: pd.to_numeric(x, errors="coerce").mean())
+        st.bar_chart(tutor_perf)
+    else:
+        st.info("Tutor group or Maths column missing — cannot compare groups.")
 # ---------------------------
 # ROUTING SYSTEM
 # ---------------------------
