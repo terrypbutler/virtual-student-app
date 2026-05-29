@@ -113,8 +113,9 @@ def render_photo_grid(df, cohort, num_cols=5):
                     # Removed the "SEN: " prefix here:
                     active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}{detail_str}</span>")
                     
-                if pp_active:
-                    active_labels.append(f"<span style='color: #1976D2; font-weight: bold;'>PP: {pp_status}</span>")
+               if pp_active:
+                    # Just print "PP" in bold blue instead of the underlying status
+                    active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
                     
                 if eal_active:
                     active_labels.append(f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>")
