@@ -18,13 +18,56 @@ COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"]
 # ---------------------------
 @st.cache_data(ttl=10)
 def load_data(url):
-    data = pd.read_csv(url)
-    data.columns = data.columns.str.strip()
-    cols_to_drop = [col for col in COLUMNS_TO_HIDE if col in data.columns]
-    if cols_to_drop:
-        data = data.drop(columns=cols_to_drop)
-    data = data.fillna("")
-    return data
+    import pandas as pd
+    import requests
+    from io import StringIO
+
+    try:
+        # --- Download raw CSV safely ---
+        response = requests.get(url)
+        response.raise_for_status()
+        csv_text = response.text
+
+        # --- Clean problematic line breaks inside rows ---
+        cleaned_lines = []
+        for line in csv_text.splitlines():
+            # Skip completely broken empty lines
+            if not line.strip():
+                continue
+            cleaned_lines.append(line)
+
+        cleaned_csv = "\n".join(cleaned_lines)
+
+        # --- Read CSV in SAFE mode ---
+        data = pd.read_csv(
+            StringIO(cleaned_csv),
+            engine="python",          # more forgiving than C engine
+            on_bad_lines="skip",      # skips broken rows automatically
+            quotechar='"',
+            skipinitialspace=True
+        )
+
+        # --- Clean headers ---
+        data.columns = data.columns.str.strip()
+
+        # --- Remove hidden system columns ---
+        COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"]
+        cols_to_drop = [col for col in COLUMNS_TO_HIDE if col in data.columns]
+        if cols_to_drop:
+            data = data.drop(columns=cols_to_drop)
+
+        # --- Normalize empty values ---
+        data = data.fillna("")
+
+        return data
+
+    except Exception as e:
+        import streamlit as st
+        st.error("⚠️ Data loading failed — using fallback empty dataset")
+        st.exception(e)
+
+        # safe fallback so app never crashes
+        return pd.DataFrame()
 
 # ---------------------------
 # Display student photo (left/right crop)
