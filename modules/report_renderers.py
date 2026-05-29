@@ -109,26 +109,41 @@ def render_passport(row, cohort, title="Student Passport"):
 def render_y7_passports(df):
     st.title("📘 Year 7 Passports")
 
-    if df is None or df.empty:
-        st.warning("No students to display.")
-        return
-
     for _, row in df.iterrows():
-        render_passport(row, cohort="Year 7", title="Year 7 Passport")
+        st.subheader(row.get("Full Name", "Unknown"))
+
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            st.write("Form Group:", row.get("Form Group", "N/A"))
+            st.write("Gender:", row.get("Gender", "N/A"))
+            st.write("SEN:", row.get("SEN Status", "N/A"))
+            st.write("Ethnicity:", row.get("Ethnicity", "N/A"))
+
+        with col2:
+            st.image("photos/" + row.get("Full Name","").lower().replace(".","") + ".png",
+                     width=140, clamp=True)
 
 
 # ---------------------------
 # YEAR 9 TRANSITION
 # ---------------------------
 def render_y9_transition(df):
-    st.title("📁 Year 9 Transition Profiles")
-
-    if df is None or df.empty:
-        st.warning("No students to display.")
-        return
+    st.title("📁 Year 9 Transition")
 
     for _, row in df.iterrows():
-        render_passport(row, cohort="Year 9", title="Year 9 Transition Profile")
+        st.subheader(row.get("Full Name", "Unknown"))
+
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            st.write("Form Group:", row.get("Form Group", "N/A"))
+            st.write("Gender:", row.get("Gender", "N/A"))
+            st.write("SEN:", row.get("SEN Status", "N/A"))
+
+        with col2:
+            st.image("photos/" + row.get("Full Name","").lower().replace(".","") + ".png",
+                     width=140, clamp=True)
 
 
 # ---------------------------
