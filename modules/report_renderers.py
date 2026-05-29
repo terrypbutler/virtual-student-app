@@ -102,14 +102,16 @@ def render_photo_grid(df, cohort, num_cols=5):
                 # Render Photo and Name
                 display_student_photo(name, cohort)
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
+            
                 
-                # --- DYNAMIC LABEL BUILDER ---
+# --- DYNAMIC LABEL BUILDER ---
                 active_labels = []
                 
                 if sen_active:
                     # Only append the brackets if a detail actually exists
                     detail_str = f" ({sen_detail})" if sen_detail.upper() not in ignore_list else ""
-                    active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>SEN: {sen_status}{detail_str}</span>")
+                    # Removed the "SEN: " prefix here:
+                    active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}{detail_str}</span>")
                     
                 if pp_active:
                     active_labels.append(f"<span style='color: #1976D2; font-weight: bold;'>PP: {pp_status}</span>")
