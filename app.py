@@ -186,64 +186,48 @@ def year9_filters(df):
         if selected_form:
             filter_conditions &= df[form_col].astype(str).isin(selected_form)
 
-    # ---------------- Dynamic Subject Filters ----------------
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📚 Subject Filters")
+# ---------------- SUBJECT FILTER SYSTEM ----------------
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📚 Subject Filter")
 
-    subject_keywords = [
-        "grade",
-        "english",
-        "maths",
-        "science",
-        "history",
-        "geography",
-        "art",
-        "music",
-        "drama",
-        "pe",
-        "computer",
-        "option"
-    ]
+subject_columns = [
+    "Eng Lang",
+    "Eng Lit",
+    "Maths",
+    "Science",
+    "Art",
+    "Computing",
+    "Design",
+    "Drama",
+    "Geography",
+    "History",
+    "Hospitality",
+    "Music",
+    "Photography",
+    "Spanish",
+    "Sport"
+]
 
-    ignored_columns = [
-        "Current Grade",
-        "Target Grade"
-    ]
+# only use subjects that actually exist
+available_subjects = [
+    s for s in subject_columns
+    if s in df.columns
+]
 
-    subject_columns = []
+selected_subject = st.sidebar.selectbox(
+    "Subject",
+    ["All Subjects"] + available_subjects
+)
 
-    for col in df.columns:
-        col_lower = col.lower()
+# filter to students who actually have a value in that subject
+if selected_subject != "All Subjects":
 
-        if col in ignored_columns:
-            continue
-
-        if any(keyword in col_lower for keyword in subject_keywords):
-            unique_vals = df[col].dropna().astype(str).unique()
-
-            # only create filter if actual grade-style data exists
-            if len(unique_vals) > 1 and len(unique_vals) < 30:
-                subject_columns.append(col)
-
-    for subject_col in sorted(subject_columns):
-
-        options = sorted(
-            [
-                x for x in df[subject_col]
-                .dropna()
-                .astype(str)
-                .unique()
-                if x.strip() != ""
-            ]
-        )
-
-        if options:
-            selected = st.sidebar.multiselect(subject_col, options)
-
-            if selected:
-                filter_conditions &= df[subject_col].astype(str).isin(selected)
-
-    return df[filter_conditions]
+    filter_conditions &= (
+        df[selected_subject]
+        .fillna("")
+        .astype(str)
+        .str.strip() != ""
+    )
 
 
 # ---------------------------
