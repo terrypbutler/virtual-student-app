@@ -6,7 +6,7 @@ import os
 from modules.data_loader import load_data
 from modules.report_renderers import (
     render_y7_passports,
-    render_y9_transition,
+    render_y9_transition
 )
 
 # ---------------------------
@@ -15,9 +15,7 @@ from modules.report_renderers import (
 st.set_page_config(page_title="Virtual Student MIS", layout="wide")
 
 YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?output=csv"
-
 YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?gid=214766920&single=true&output=csv"
-
 
 # ---------------------------
 # DATA LOAD
@@ -25,12 +23,10 @@ YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyH
 selected_cohort = st.sidebar.radio("📅 Cohort", ["Year 7", "Year 9"])
 df = load_data(YEAR_7_URL if selected_cohort == "Year 7" else YEAR_9_URL)
 
-
 # ---------------------------
 # SIDEBAR NAV
 # ---------------------------
 st.sidebar.title("🎓 School MIS Dashboard")
-
 page = st.sidebar.radio(
     "Navigate",
     [
@@ -41,9 +37,8 @@ page = st.sidebar.radio(
     ]
 )
 
-
 # ---------------------------
-# STUDENT PASSPORT RENDERER (USED BY SEARCH)
+# STUDENT PASSPORT RENDERER
 # ---------------------------
 def render_student_passport(student_row, cohort):
     NAME_COLUMN = "Full Name"
@@ -54,7 +49,6 @@ def render_student_passport(student_row, cohort):
     header = f"{s_name} ({s_dob})" if s_dob else s_name
 
     with st.expander(f"👤 {header}"):
-
         left, right = st.columns([3, 1])
 
         with left:
@@ -62,18 +56,15 @@ def render_student_passport(student_row, cohort):
 
         # ---------------- PHOTO ----------------
         photo_folder = "photos"
-
         if os.path.exists(photo_folder):
             try:
                 safe_name = s_name.strip().replace(".", "").lower()
                 filename = f"{safe_name}.png"
-
                 files = {f.lower(): f for f in os.listdir(photo_folder)}
 
                 if filename in files:
                     img = Image.open(os.path.join(photo_folder, files[filename]))
                     w, h = img.size
-
                     trim = int(h * 0.08)
                     top = trim
                     bottom = h - trim
@@ -85,10 +76,8 @@ def render_student_passport(student_row, cohort):
 
                     img = img.crop(crop)
                     right.image(img, width=220)
-
                 else:
                     right.caption("*(Photo missing)*")
-
             except:
                 right.caption("*(Image error)*")
         else:
@@ -114,7 +103,6 @@ def render_student_passport(student_row, cohort):
         }
 
         table_html = "<table style='width:100%; border-collapse: collapse;'>"
-
         for label, keys in info.items():
             table_html += f"""
             <tr>
@@ -123,47 +111,81 @@ def render_student_passport(student_row, cohort):
                 </td>
             </tr>
             """
-
         table_html += "</table>"
-
         st.markdown(table_html, unsafe_allow_html=True)
 
-
 # ---------------------------
-# SEARCH PAGE (NOW MATCHES REPORT STYLE)
+# SEARCH PAGE
 # ---------------------------
 def student_search(df):
     st.title("🔍 Student Search (MIS View)")
-
     query = st.text_input("Search student name")
-
     if query:
         results = df[df["Full Name"].str.contains(query, case=False, na=False)]
-
         st.write(f"Found {len(results)} students")
-
         if len(results) == 0:
             st.warning("No matches found.")
-
         for _, row in results.iterrows():
             render_student_passport(row, selected_cohort)
 
+# ---------------------------
+# FILTERS FOR YEAR 7
+# ---------------------------
+def year7_filters(df):
+    st.sidebar.subheader("Filter Year 7")
+    maths_col = "Maths Set" if "Maths Set" in df.columns else None
+    form_col = "Form Group" if "Form Group" in df.columns else None
+    filter_conditions = pd.Series([True] * len(df))
+
+    if maths_col:
+        selected_math = st.sidebar.multiselect("Maths Set", sorted(df[maths_col].dropna().unique()))
+        if selected_math:
+            filter_conditions &= df[maths_col].isin(selected_math)
+
+    if form_col:
+        selected_form = st.sidebar.multiselect("Form Group", sorted(df[form_col].dropna().unique()))
+        if selected_form:
+            filter_conditions &= df[form_col].isin(selected_form)
+
+    return df[filter_conditions]
 
 # ---------------------------
-# ANALYTICS (NO MATPLOTLIB)
+# FILTERS FOR YEAR 9
+# ---------------------------
+def year9_filters(df):
+    st.sidebar.subheader("Filter Year 9")
+    maths_col = "Maths Set" if "Maths Set" in df.columns else None
+    form_col = "Form Group" if "Form Group" in df.columns else None
+    option_col = next((c for c in df.columns if c.startswith("Option")), None)
+    filter_conditions = pd.Series([True] * len(df))
+
+    if maths_col:
+        selected_math = st.sidebar.multiselect("Maths Set", sorted(df[maths_col].dropna().unique()))
+        if selected_math:
+            filter_conditions &= df[maths_col].isin(selected_math)
+
+    if form_col:
+        selected_form = st.sidebar.multiselect("Form Group", sorted(df[form_col].dropna().unique()))
+        if selected_form:
+            filter_conditions &= df[form_col].isin(selected_form)
+
+    if option_col:
+        selected_option = st.sidebar.multiselect(f"{option_col} Grade", sorted(df[option_col].dropna().unique()))
+        if selected_option:
+            filter_conditions &= df[option_col].isin(selected_option)
+
+    return df[filter_conditions]
+
+# ---------------------------
+# ANALYTICS
 # ---------------------------
 def analytics(df):
     st.title("📊 Cohort Analytics Dashboard")
-
     st.subheader("Overview")
-
     col1, col2, col3 = st.columns(3)
-
     col1.metric("Students", len(df))
-
     if "SEN Status" in df.columns:
         col2.metric("SEN", (df["SEN Status"].fillna("") != "").sum())
-
     if "EAL" in df.columns:
         col3.metric("EAL", (df["EAL"].fillna("") != "").sum())
 
@@ -172,14 +194,12 @@ def analytics(df):
     if "SEN Status" in df.columns:
         st.subheader("SEN Distribution")
         st.bar_chart(df["SEN Status"].value_counts())
-
     if "EAL" in df.columns:
         st.subheader("EAL Distribution")
         st.bar_chart(df["EAL"].value_counts())
 
     st.subheader("Raw Data")
     st.dataframe(df, use_container_width=True)
-
 
 # ---------------------------
 # ROUTING
@@ -188,11 +208,12 @@ if page == "Student Search":
     student_search(df)
 
 elif page == "Year 7 Passports":
-    render_y7_passports(df)
+    filtered_df = year7_filters(df)
+    render_y7_passports(filtered_df)
 
 elif page == "Year 9 Transition":
-    render_y9_transition(df)
-
+    filtered_df = year9_filters(df)
+    render_y9_transition(filtered_df)
 
 elif page == "Analytics":
     analytics(df)
