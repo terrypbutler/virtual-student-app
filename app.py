@@ -95,78 +95,151 @@ def analytics(df):
             st.pyplot(fig)
 
 def analytics(df):
-    st.title("📊 Cohort Analytics Dashboard")
+    st.title("📊 MIS Cohort Intelligence Dashboard")
 
-    st.markdown("Visualize your cohort: SEN, EAL, Disadvantaged, and Academic Performance.")
+    st.markdown("Use filters to explore cohort performance and group-level patterns.")
 
-    # Make sure necessary columns exist
-    sen_col = "SEN Status" if "SEN Status" in df.columns else None
-    eal_col = "EAL" if "EAL" in df.columns else None
-    pp_col = None
-    for c in ["Pupil Premium", "Disadvantaged (PP)", "Premium"]:
-        if c in df.columns:
-            pp_col = c
-            break
-    maths_col = None
-    for c in ["SATs Maths", "SAT's Maths", "Maths Score"]:
-        if c in df.columns:
-            maths_col = c
-            break
+    # ---------------------------
+    # SIDEBAR FILTERS (INSIDE PAGE)
+    # ---------------------------
+    st.subheader("🎛 Filters")
+
+    colA, colB, colC = st.columns(3)
+
+    # Tutor / Form Group
     tutor_col = None
     for c in ["Tutor Group", "Form Group", "Form Tutor"]:
         if c in df.columns:
             tutor_col = c
             break
 
-    # -------------------------------
-    # 1️⃣ Stacked Bar: SEN / EAL / PP
-    # -------------------------------
-    st.subheader("🔹 SEN / EAL / Disadvantaged (PP) Distribution")
-
-    if sen_col or eal_col or pp_col:
-        stacked_df = pd.DataFrame()
-
-        if sen_col:
-            stacked_df["SEN"] = df[sen_col].fillna("None").map(lambda x: 1 if x not in ["", "None", "No"] else 0)
-        if eal_col:
-            stacked_df["EAL"] = df[eal_col].fillna("No").map(lambda x: 1 if x not in ["", "No"] else 0)
-        if pp_col:
-            stacked_df["PP"] = df[pp_col].fillna("No").map(lambda x: 1 if x not in ["", "No"] else 0)
-
-        st.bar_chart(stacked_df.sum())
-
+    if tutor_col:
+        tutor_options = ["All"] + sorted(df[tutor_col].dropna().unique().tolist())
+        selected_tutor = colA.selectbox("Tutor Group", tutor_options)
     else:
-        st.info("SEN, EAL or Pupil Premium columns not found in this dataset.")
+        selected_tutor = "All"
+
+    # Metric selector
+    metric_options = []
+    if any(c in df.columns for c in ["SATs Maths", "SAT's Maths", "Maths Score"]):
+        metric_options.append("Maths")
+    if any(c in df.columns for c in ["SATs Reading", "SAT's Reading", "Reading Score"]):
+        metric_options.append("Reading")
+
+    selected_metric = colB.selectbox("Academic Metric", metric_options if metric_options else ["None"])
+
+    # Grouping mode
+    group_mode = colC.selectbox(
+        "Group By",
+        ["Whole Cohort", "Tutor Group", "SEN Status", "EAL"]
+    )
 
     st.write("---")
 
-    # -------------------------------
-    # 2️⃣ Maths Grade Distribution Histogram
-    # -------------------------------
-    if maths_col:
-        st.subheader("🔹 Maths Grade Distribution")
-        grades = df[maths_col].dropna().astype(str)
+    # ---------------------------
+    # FILTER DATASET
+    # ---------------------------
+    filtered = df.copy()
 
-        # convert grades to numeric if possible, else use string counts
-        try:
-            grades_numeric = pd.to_numeric(grades, errors="coerce").dropna()
-            st.bar_chart(grades_numeric.value_counts().sort_index())
-        except:
-            st.bar_chart(grades.value_counts().sort_index())
-    else:
-        st.info("Maths grade column not found in this dataset.")
+    if tutor_col and selected_tutor != "All":
+        filtered = filtered[filtered[tutor_col] == selected_tutor]
+
+    # ---------------------------
+    # METRIC COLUMN RESOLUTION
+    # ---------------------------
+    metric_col = None
+
+    if selected_metric == "Maths":
+        for c in ["SATs Maths", "SAT's Maths", "Maths Score"]:
+            if c in df.columns:
+                metric_col = c
+                break
+
+    elif selected_metric == "Reading":
+        for c in ["SATs Reading", "SAT's Reading", "Reading Score"]:
+            if c in df.columns:
+                metric_col = c
+                break
+
+    # ---------------------------
+    # 1️⃣ OVERVIEW METRICS
+    # ---------------------------
+    st.subheader("📌 Overview")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Students", len(filtered))
+
+    if "SEN Status" in filtered.columns:
+        sen_count = (filtered["SEN Status"].fillna("").str.lower() != "").sum()
+        c2.metric("SEN Students", sen_count)
+
+    if "EAL" in filtered.columns:
+        eal_count = (filtered["EAL"].fillna("").str.lower() != "").sum()
+        c3.metric("EAL Students", eal_count)
 
     st.write("---")
 
-    # -------------------------------
-    # 3️⃣ Tutor Group Comparison
-    # -------------------------------
-    if tutor_col and maths_col:
-        st.subheader("🔹 Maths Performance by Tutor Group")
-        tutor_perf = df.groupby(tutor_col)[maths_col].apply(lambda x: pd.to_numeric(x, errors="coerce").mean())
-        st.bar_chart(tutor_perf)
+    # ---------------------------
+    # 2️⃣ GROUPED PERFORMANCE CHART
+    # ---------------------------
+    st.subheader("📊 Group Performance Comparison")
+
+    if metric_col:
+        if group_mode == "Whole Cohort":
+            st.bar_chart(filtered[metric_col].value_counts().sort_index())
+
+        elif group_mode == "Tutor Group" and tutor_col:
+            grouped = filtered.groupby(tutor_col)[metric_col].apply(
+                lambda x: pd.to_numeric(x, errors="coerce").mean()
+            )
+            st.bar_chart(grouped)
+
+        elif group_mode == "SEN Status" and "SEN Status" in filtered.columns:
+            grouped = filtered.groupby("SEN Status")[metric_col].apply(
+                lambda x: pd.to_numeric(x, errors="coerce").mean()
+            )
+            st.bar_chart(grouped)
+
+        elif group_mode == "EAL" and "EAL" in filtered.columns:
+            grouped = filtered.groupby("EAL")[metric_col].apply(
+                lambda x: pd.to_numeric(x, errors="coerce").mean()
+            )
+            st.bar_chart(grouped)
     else:
-        st.info("Tutor group or Maths column missing — cannot compare groups.")
+        st.info("No valid academic metric found for this cohort.")
+
+    st.write("---")
+
+    # ---------------------------
+    # 3️⃣ DISTRIBUTION VIEW (SEN / EAL / PP)
+    # ---------------------------
+    st.subheader("🔹 Cohort Profile Breakdown")
+
+    breakdown = {}
+
+    if "SEN Status" in filtered.columns:
+        breakdown["SEN"] = (filtered["SEN Status"].fillna("") != "").sum()
+
+    if "EAL" in filtered.columns:
+        breakdown["EAL"] = (filtered["EAL"].fillna("") != "").sum()
+
+    for c in ["Pupil Premium", "Disadvantaged (PP)", "Premium"]:
+        if c in filtered.columns:
+            breakdown["PP"] = (filtered[c].fillna("") != "").sum()
+            break
+
+    if breakdown:
+        st.bar_chart(pd.Series(breakdown))
+
+    st.write("---")
+
+    # ---------------------------
+    # 4️⃣ RAW INSPECTOR (MIS STYLE)
+    # ---------------------------
+    st.subheader("🔍 Data Inspector")
+
+    st.dataframe(filtered, use_container_width=True)
 # ---------------------------
 # ROUTING SYSTEM
 # ---------------------------
