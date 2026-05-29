@@ -117,20 +117,14 @@ def render_student_passport(student_row, cohort):
             "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
         }
 
-        table_html = "<table style='width:100%; border-collapse: collapse;'>"
+st.markdown("### 📋 Student Summary")
 
-        for label, keys in info.items():
-            table_html += f"""
-            <tr>
-                <td style='border:1px solid #ddd; padding:8px;'>
-                    <strong>{label}:</strong> {get_val(keys)}
-                </td>
-            </tr>
-            """
+for label, keys in info.items():
+    value = get_val(keys)
 
-        table_html += "</table>"
-
-        st.markdown(table_html, unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 2])
+    col1.markdown(f"**{label}**")
+    col2.markdown(str(value))
 
 
 # ---------------------------
