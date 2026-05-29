@@ -42,46 +42,50 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True):
             else:
                 st.caption("No subject data available.")
 
-# --- NEW FUNCTION FOR THE GRID ---
 def render_photo_grid(df, cohort, num_cols=5):
     """
-    Renders a grid of student photos with key demographic details.
+    Renders a strict grid of student photos with key demographic details.
+    Forces horizontal alignment by creating new columns per row.
     """
     if df.empty:
         st.warning("No students found for this selection.")
         return
 
-    # Create the columns for the grid
-    cols = st.columns(num_cols)
-    
-    # Loop through the filtered students
-    for index, (_, row) in enumerate(df.iterrows()):
-        name = row.get("Full Name", "Unknown")
+    # Loop through the dataframe in chunks to create strict horizontal rows
+    for i in range(0, len(df), num_cols):
         
-        # Safely extract the details using your helper map
-        sen_status = get_field(row, "sen_status")
-        sen_detail = get_field(row, "sen_detail")
-        pp_status = get_field(row, "pp")
-        eal_status = get_field(row, "eal")
+        # Create a fresh set of columns for this specific row
+        cols = st.columns(num_cols)
         
-        # Figure out which column this student goes into
-        col = cols[index % num_cols]
+        # Grab the next batch of students (e.g., 5 at a time)
+        row_students = df.iloc[i : i + num_cols]
         
-        with col:
-            display_student_photo(name, cohort)
-            
-            # Render name
-            st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
-            
-            # Render details compactly using a small, centered HTML block
-            details_html = f"""
-            <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.3;'>
-                <strong>SEN:</strong> {sen_status}<br>
-                <strong>Detail:</strong> {sen_detail}<br>
-                <strong>PP:</strong> {pp_status} | <strong>EAL:</strong> {eal_status}
-            </div>
-            """
-            st.markdown(details_html, unsafe_allow_html=True)
-            
-            # Visual separator between rows
-            st.write("---")
+        # Assign each student to a column strictly within this row
+        for col, (_, row) in zip(cols, row_students.iterrows()):
+            with col:
+                name = row.get("Full Name", "Unknown")
+                
+                # Safely extract the details using your helper map
+                sen_status = get_field(row, "sen_status")
+                sen_detail = get_field(row, "sen_detail")
+                pp_status = get_field(row, "pp")
+                eal_status = get_field(row, "eal")
+                
+                # Render Photo
+                display_student_photo(name, cohort)
+                
+                # Render Name
+                st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
+                
+                # Render Details
+                details_html = f"""
+                <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.3;'>
+                    <strong>SEN:</strong> {sen_status}<br>
+                    <strong>Detail:</strong> {sen_detail}<br>
+                    <strong>PP:</strong> {pp_status} | <strong>EAL:</strong> {eal_status}
+                </div>
+                """
+                st.markdown(details_html, unsafe_allow_html=True)
+        
+        # Draw a clean horizontal line across the screen after each full row is complete
+        st.write("---")
