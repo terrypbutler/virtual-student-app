@@ -256,6 +256,50 @@ def analytics(df):
     st.dataframe(df, use_container_width=True)
 
 # ---------------------------
+# YEAR 9 TRANSITION PAGE
+# ---------------------------
+if page == "Year 9 Transition":
+
+    # Make a copy of the cohort
+    filtered_df = df.copy()
+
+    # ---------------- FILTERS ----------------
+    # Form Group
+    form_groups = sorted(filtered_df['Form Group'].dropna().unique())
+    selected_form = st.sidebar.multiselect("Form Group", form_groups, default=form_groups)
+
+    # Maths Set
+    if 'Maths Set' in filtered_df.columns:
+        maths_sets = sorted(filtered_df['Maths Set'].dropna().unique())
+        selected_math = st.sidebar.multiselect("Maths Set", maths_sets, default=maths_sets)
+    else:
+        selected_math = []
+
+    # Subject filter
+    subject_columns = [
+        "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama",
+        "Geography","History","Hospitality","Music","Photography","Spanish","Sport"
+    ]
+    available_subjects = [s for s in subject_columns if s in filtered_df.columns]
+    selected_subject = st.sidebar.selectbox("Subject", ["All Subjects"] + available_subjects)
+
+    # ---------------- APPLY FILTERS ----------------
+    if selected_form:
+        filtered_df = filtered_df[filtered_df['Form Group'].isin(selected_form)]
+
+    if selected_math:
+        filtered_df = filtered_df[filtered_df['Maths Set'].isin(selected_math)]
+
+    if selected_subject != "All Subjects":
+        filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
+
+    # ---------------- SAFE CHECK ----------------
+    if filtered_df.empty:
+        st.warning("No students match the selected filters.")
+    else:
+        render_y9_transition(filtered_df)
+
+# ---------------------------
 # ROUTING
 # ---------------------------
 if page == "Student Search":
