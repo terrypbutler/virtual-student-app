@@ -244,7 +244,6 @@ def year9_filters(df):
                 filter_conditions &= df[subject_col].astype(str).isin(selected)
 
     return df[filter_conditions]
-```
 
 
 # ---------------------------
