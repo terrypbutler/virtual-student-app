@@ -45,19 +45,19 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True):
 def render_photo_grid(df, cohort, num_cols=5):
     """
     Renders a strict grid of student photos with key demographic details.
-    Includes a metrics dashboard at the top for quick cohort analysis.
+    Includes a metrics dashboard and conditional color-coding for SEN/PP/EAL.
     """
     if df.empty:
         st.warning("No students found for this selection.")
         return
 
+    # Negative words to ignore when counting/highlighting flags
+    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN"]
+
     # --- 1. CALCULATE COHORT STATS ---
     sen_count = 0
     eal_count = 0
     pp_count = 0
-
-    # Negative words to ignore when counting flags
-    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE"]
 
     for _, row in df.iterrows():
         if str(get_field(row, "sen_status")).strip().upper() not in ignore_list:
@@ -70,18 +70,15 @@ def render_photo_grid(df, cohort, num_cols=5):
     # --- 2. RENDER METRICS DASHBOARD ---
     st.markdown("### 📊 Selection Overview")
     
-    # Create 4 equal columns for the top metrics
     m1, m2, m3, m4 = st.columns(4)
-    
     m1.metric("Total Students", len(df))
     m2.metric("SEN Support", sen_count)
     m3.metric("EAL", eal_count)
     m4.metric("Pupil Premium", pp_count)
 
-    st.write("---") # Thick divider before the photos start
+    st.write("---") 
 
     # --- 3. RENDER PHOTO GRID ---
-    # Loop through the dataframe in chunks to create strict horizontal rows
     for i in range(0, len(df), num_cols):
         cols = st.columns(num_cols)
         row_students = df.iloc[i : i + num_cols]
@@ -90,20 +87,45 @@ def render_photo_grid(df, cohort, num_cols=5):
             with col:
                 name = row.get("Full Name", "Unknown")
                 
+                # Extract raw values
                 sen_status = get_field(row, "sen_status")
                 sen_detail = get_field(row, "sen_detail")
                 pp_status = get_field(row, "pp")
                 eal_status = get_field(row, "eal")
                 
-                display_student_photo(name, cohort)
+                # Check if flags are active
+                sen_active = str(sen_status).strip().upper() not in ignore_list
+                pp_active = str(pp_status).strip().upper() not in ignore_list
+                eal_active = str(eal_status).strip().upper() not in ignore_list
                 
+                # Render Photo and Name
+                display_student_photo(name, cohort)
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
                 
+                # --- CONDITIONAL COLOR FORMATTING ---
+                # SEN logic: Red, Bold, include detail if active
+                if sen_active:
+                    sen_html = f"<span style='color: #D32F2F; font-weight: bold;'>SEN: {sen_status} ({sen_detail})</span>"
+                else:
+                    sen_html = f"SEN: {sen_status}"
+                    
+                # PP logic: Blue if active
+                if pp_active:
+                    pp_html = f"<span style='color: #1976D2; font-weight: bold;'>PP: {pp_status}</span>"
+                else:
+                    pp_html = f"PP: {pp_status}"
+                    
+                # EAL logic: Green if active
+                if eal_active:
+                    eal_html = f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>"
+                else:
+                    eal_html = f"EAL: {eal_status}"
+                
+                # Combine into final HTML block
                 details_html = f"""
-                <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.3;'>
-                    <strong>SEN:</strong> {sen_status}<br>
-                    <strong>Detail:</strong> {sen_detail}<br>
-                    <strong>PP:</strong> {pp_status} | <strong>EAL:</strong> {eal_status}
+                <div style='text-align: center; font-size: 0.8em; color: #555; line-height: 1.4; padding-bottom: 10px;'>
+                    {sen_html}<br>
+                    {pp_html} | {eal_html}
                 </div>
                 """
                 st.markdown(details_html, unsafe_allow_html=True)
