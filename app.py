@@ -2,213 +2,174 @@ import streamlit as st
 import pandas as pd
 import os
 from PIL import Image
-import requests
-from io import StringIO
 
-st.set_page_config(page_title="Virtual Student MIS", layout="wide")
+st.set_page_config(page_title="Virtual Student Intake", layout="wide")
 
 # ---------------------------
-# DATA SOURCES (REPLACE THESE)
+# URLs for Google Sheets CSV
 # ---------------------------
 YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pubhtml?gid=0&single=true"
 YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pubhtml?gid=214766920&single=true"
 
-COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"]
+COLUMNS_TO_HIDE = ["Picture", "First Name", "Surname Initial", "Student ID"] 
 
 # ---------------------------
-# SAFE DATA LOADER (CRASH PROOF)
+# Data Loader
 # ---------------------------
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10)
 def load_data(url):
+    data = pd.read_csv(url)
+    data.columns = data.columns.str.strip()
+    cols_to_drop = [col for col in COLUMNS_TO_HIDE if col in data.columns]
+    if cols_to_drop:
+        data = data.drop(columns=cols_to_drop)
+    data = data.fillna("")
+    return data
+
+# ---------------------------
+# Display student photo (left/right crop)
+# ---------------------------
+def display_student_photo(student_name, cohort):
+    safe_name = str(student_name).strip().replace(".", "")
+    folder_path = "photos"
+    if not os.path.exists(folder_path):
+        st.caption("*(Error: 'photos' folder not found)*")
+        return
+
     try:
-        r = requests.get(url)
-        r.raise_for_status()
+        all_files = os.listdir(folder_path)
+        file_map = {f.lower(): f for f in all_files}
+        target_filename = f"{safe_name.lower()}.png"
 
-        df = pd.read_csv(
-            StringIO(r.text),
-            engine="python",
-            on_bad_lines="skip"
-        )
+        if target_filename in file_map:
+            img = Image.open(os.path.join(folder_path, file_map[target_filename]))
+            width, height = img.size
+            trim_amount = int(height * 0.08)
+            top_edge = trim_amount
+            bottom_edge = height - trim_amount
 
-        df.columns = df.columns.str.strip()
+            if cohort == "Year 9":
+                crop_box = (width // 2, top_edge, width, bottom_edge)
+            else:
+                crop_box = (0, top_edge, width // 2, bottom_edge)
 
-        drop = [c for c in COLUMNS_TO_HIDE if c in df.columns]
-        if drop:
-            df = df.drop(columns=drop)
-
-        return df.fillna("")
-
-    except Exception as e:
-        st.error("❌ Data failed to load")
-        st.exception(e)
-        return pd.DataFrame()
-
-# ---------------------------
-# SAFE COLUMN FINDER
-# ---------------------------
-def find_column(df, keywords):
-    for col in df.columns:
-        col_clean = col.strip().lower()
-        for k in keywords:
-            if k.lower() == col_clean:
-                return col
-    return None
+            st.image(img.crop(crop_box), width=220)
+        else:
+            st.caption(f"*(Missing photo: {safe_name}.png)*")
+    except Exception:
+        st.caption("*(File error or invalid image)*")
 
 # ---------------------------
-# PHOTO DISPLAY (LEFT / RIGHT CROPPING)
+# Helper: get first valid value from multiple keys
 # ---------------------------
-def display_student_photo(name, cohort):
-    folder = "photos"
-
-    if not os.path.exists(folder):
-        st.caption("No photo folder")
-        return
-
-    safe = name.lower().replace(".", "")
-    files = {f.lower(): f for f in os.listdir(folder)}
-
-    key = f"{safe}.png"
-
-    if key not in files:
-        st.caption("No photo")
-        return
-
-    img = Image.open(os.path.join(folder, files[key]))
-    w, h = img.size
-
-    trim = int(h * 0.08)
-    top, bottom = trim, h - trim
-
-    if cohort == "Year 7":
-        crop = (0, top, w // 2, bottom)
-    else:
-        crop = (w // 2, top, w, bottom)
-
-    st.image(img.crop(crop), width=220)
-
-# ---------------------------
-# SAFE VALUE GETTER
-# ---------------------------
-def get_val(row, keywords):
-    for col in row.index:
-        for k in keywords:
-            if k.lower() in col.lower():
-                val = str(row[col]).strip()
-                if val:
-                    return val
+def get_val(row_data, keys):
+    keys_lower = [k.lower() for k in keys]
+    for col in row_data.index:
+        if col.lower() in keys_lower and str(row_data[col]).strip() != "":
+            return str(row_data[col])
     return "N/A"
 
 # ---------------------------
-# DATA VALIDATION PANEL
+# Render Year 7 Passports
 # ---------------------------
-def data_validation(df):
-    st.subheader("📊 Data Health Check")
+def render_y7_passports(filtered_df):
+    st.markdown("### 📄 Year 7 Passports")
+    for _, row in filtered_df.iterrows():
+        s_name = str(row.get("Full Name", "Unknown Student"))
+        s_dob = str(row.get("DoB", "")).strip()
+        header_text = f"{s_name} ({s_dob})" if s_dob else s_name
 
-    st.write("### Column Overview")
-
-    summary = []
-    for col in df.columns:
-        missing = df[col].isna().sum()
-        summary.append([col, len(df), missing])
-
-    st.dataframe(pd.DataFrame(summary, columns=["Column", "Rows", "Missing"]))
-
-# ---------------------------
-# FILTER SYSTEM (SAFE)
-# ---------------------------
-def apply_filters(df):
-    st.sidebar.subheader("🧭 Filters")
-
-    filters = {
-        "Maths Set": ["maths set", "maths"],
-        "English Set": ["english set", "english"],
-        "Science Set": ["science set", "science"],
-        "Tutor Group": ["tutor", "form"],
-        "Year Group": ["year"]
-    }
-
-    filtered = df.copy()
-
-    for label, keys in filters.items():
-        col = find_column(filtered, keys)
-
-        if col:
-            options = sorted([x for x in filtered[col].unique() if str(x).strip()])
-
-            if len(options) > 1:
-                choice = st.sidebar.selectbox(label, ["All"] + options)
-
-                if choice != "All":
-                    filtered = filtered[filtered[col] == choice]
-
-    return filtered
-
-# ---------------------------
-# PASSPORT RENDERER
-# ---------------------------
-def render_passports(df, cohort):
-    st.title(f"🎓 {cohort} Student Passports")
-
-    for _, row in df.iterrows():
-
-        name = row.get("Full Name", "Unknown")
-        dob = row.get("DoB", "")
-        header = f"{name} ({dob})" if dob else name
-
-        with st.expander(header):
-
-            c1, c2 = st.columns([3, 1])
-
-            with c1:
-                st.markdown(f"### {header}")
-
-            with c2:
-                display_student_photo(name, cohort)
+        with st.expander(f"👤 {header_text} — Year 7 Passport"):
+            title_col, photo_col = st.columns([3, 1])
+            with title_col:
+                st.markdown(f"### **{header_text}**")
+            with photo_col:
+                display_student_photo(s_name, "Year 7")
 
             st.write("---")
-
             info = {
-                "Form Group": ["form", "tutor"],
-                "Gender": ["gender"],
-                "SEN Status": ["sen", "send"],
-                "Ethnicity": ["ethnicity"],
-                "EAL": ["eal"],
-                "Disadvantaged": ["pupil premium", "disadvantaged"],
-                "SATs Reading": ["reading"],
-                "SATs Maths": ["maths"]
+                "Form Group": ["Form Tutor", "Tutor", "Form Group"],
+                "Gender": ["Gender"],
+                "SEN Status": ["SEN Status", "SEND Status"],
+                "SEN Detail": ["SEND detail", "SEN detail"],
+                "Ethnicity": ["Ethnicity"],
+                "EAL": ["EAL", "EAL Status"],
+                "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium", "Disadvantaged (PP)"],
+                "SATs Reading": ["SATs Reading", "SAT's Reading", "Reading Score"],
+                "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
             }
 
             for label, keys in info.items():
+                value = get_val(row, keys)
                 col1, col2 = st.columns([1, 2])
-                col1.markdown(f"**{label}**")
-                col2.markdown(get_val(row, keys))
+                col1.markdown(f"**{label}:**")
+                col2.markdown(str(value))
 
 # ---------------------------
-# MAIN APP
+# Render Year 9 Passports
 # ---------------------------
-st.title("🎓 Virtual Student MIS System")
+def render_y9_passports(filtered_df):
+    st.markdown("### 📄 Year 9 Passports")
+    for _, row in filtered_df.iterrows():
+        s_name = str(row.get("Full Name", "Unknown Student"))
+        s_dob = str(row.get("DoB", "")).strip()
+        header_text = f"{s_name} ({s_dob})" if s_dob else s_name
 
-cohort = st.radio("Select Cohort", ["Year 7", "Year 9"], horizontal=True)
+        with st.expander(f"👤 {header_text} — Year 9 Passport"):
+            title_col, photo_col = st.columns([3, 1])
+            with title_col:
+                st.markdown(f"### **{header_text}**")
+            with photo_col:
+                display_student_photo(s_name, "Year 9")
 
-df = load_data(YEAR_7_URL if cohort == "Year 7" else YEAR_9_URL)
+            st.write("---")
+            info = {
+                "Form Group": ["Form Tutor", "Tutor", "Form Group"],
+                "Gender": ["Gender"],
+                "SEN Status": ["SEN Status", "SEND Status"],
+                "SEN Detail": ["SEND detail", "SEN detail"],
+                "Ethnicity": ["Ethnicity"],
+                "EAL": ["EAL", "EAL Status"],
+                "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium", "Disadvantaged (PP)"],
+                "SATs Reading": ["SATs Reading", "SAT's Reading", "Reading Score"],
+                "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
+            }
 
-if df.empty:
-    st.stop()
+            for label, keys in info.items():
+                value = get_val(row, keys)
+                col1, col2 = st.columns([1, 2])
+                col1.markdown(f"**{label}:**")
+                col2.markdown(str(value))
 
-df = apply_filters(df)
+# ---------------------------
+# Main App
+# ---------------------------
+try:
+    st.title("🎓 Virtual Student Intake Dashboard")
+    st.caption("Live simulation data framework for teacher training modules.")
 
-st.write("---")
+    selected_cohort = st.radio("📅 Select Cohort:", ["Year 7", "Year 9"], horizontal=True)
+    st.write("---")
 
-if st.checkbox("📊 Data Health Check"):
-    data_validation(df)
+    df = load_data(YEAR_7_URL if selected_cohort=="Year 7" else YEAR_9_URL)
 
-st.write("---")
+    # Group / Set view
+    view_type = st.radio("🔍 Group View By:", ["Maths Set", "Tutor Group"], horizontal=True)
+    TARGET_COLUMN = "Maths Set" if view_type=="Maths Set" else next((col for col in df.columns if col in ["Form Group","Tutor Group","Form Tutor","Tutor"]), "Form Group")
+    available_sets = sorted(df[TARGET_COLUMN].dropna().unique().tolist())
+    selected_set = st.selectbox(f"🎯 Select {selected_cohort} {view_type}:", available_sets)
+    filtered_df = df[df[TARGET_COLUMN] == selected_set]
 
-search = st.text_input("🔍 Search student name")
+    st.write("---")
 
-if search:
-    df = df[df["Full Name"].str.contains(search, case=False, na=False)]
+    # ---------------------------
+    # Render Passports
+    # ---------------------------
+    if selected_cohort == "Year 7":
+        render_y7_passports(filtered_df)
+    else:
+        render_y9_passports(filtered_df)
 
-st.write("---")
-
-render_passports(df, cohort)
+except Exception as e:
+    st.error("Error running application. Check data and column names.")
+    st.exception(e)
