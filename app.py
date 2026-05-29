@@ -44,6 +44,7 @@ page = st.sidebar.radio(
 # ---------------------------
 # STUDENT PASSPORT RENDERER
 # ---------------------------
+st.error("USING NEW PASSPORT FUNCTION")
 def render_student_passport(student_row, cohort):
     import streamlit as st
     import os
