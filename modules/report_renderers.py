@@ -1,117 +1,140 @@
-import pandas as pd
 import streamlit as st
-from modules.ui_components import render_student_header, render_student_summary
-from modules.helpers import get_header_title
+from PIL import Image
+import os
+
+# ---------------------------
+# SHARED HELPERS
+# ---------------------------
+def get_val(row, keys):
+    """Safely fetch first available value from multiple possible column names"""
+    for k in keys:
+        if k in row and str(row[k]).strip():
+            return row[k]
+    return "N/A"
+
+
+def render_photo(student_name, cohort):
+    """Handles left/right cropped student photos consistently"""
+
+    photo_folder = "photos"
+
+    if not os.path.exists(photo_folder):
+        st.caption("*(No photo folder found)*")
+        return
+
+    try:
+        safe_name = str(student_name).strip().replace(".", "").lower()
+        filename = f"{safe_name}.png"
+
+        files = {f.lower(): f for f in os.listdir(photo_folder)}
+
+        if filename not in files:
+            st.caption("*(Photo missing)*")
+            return
+
+        img = Image.open(os.path.join(photo_folder, files[filename]))
+        w, h = img.size
+
+        # crop top/bottom slightly
+        trim = int(h * 0.08)
+        top = trim
+        bottom = h - trim
+
+        if cohort == "Year 7":
+            crop = (0, top, w // 2, bottom)   # left side
+        else:
+            crop = (w // 2, top, w, bottom)   # right side
+
+        img = img.crop(crop)
+        st.image(img, width=220)
+
+    except Exception:
+        st.caption("*(Image error)*")
 
 
 # ---------------------------
-# YEAR 7 PASSPORT REPORT
+# BASE PASSPORT LAYOUT
 # ---------------------------
-def render_y7_passports(filtered_df):
-    st.subheader("📄 Year 7 Transition Passports")
+def render_passport(row, cohort, title="Student Passport"):
+    NAME = "Full Name"
+    DOB = "DoB"
 
-    for _, row in filtered_df.iterrows():
-        header = get_header_title(row, "Year 7 Passport")
+    name = str(row.get(NAME, "Unknown Student"))
+    dob = str(row.get(DOB, "")).strip()
 
-        with st.container():
-            render_student_header(row, "Year 7 Passport", "Year 7")
+    header = f"{name} ({dob})" if dob else name
 
-            st.write("---")
-            render_student_summary(row)
+    with st.expander(f"👤 {header}"):
 
-            st.write("---")
+        left, right = st.columns([3, 1])
 
-            # Optional extra fields
-            excluded = ["Full Name", "DoB"]
-            extra_cols = [c for c in filtered_df.columns if c not in excluded]
+        with left:
+            st.markdown(f"### **{title}: {header}**")
 
-            left_tab, right_tab = st.tabs(["General Info", "Additional Notes"])
+        with right:
+            render_photo(name, cohort)
 
-            with left_tab:
-                for col in extra_cols[:10]:
-                    st.markdown(f"**{col}:** {row[col]}")
+        # ---------------- CORE DATA BLOCK ----------------
+        info = {
+            "Form Group": ["Form Tutor", "Tutor", "Form Group"],
+            "Gender": ["Gender"],
+            "SEN Status": ["SEN Status", "SEND Status"],
+            "SEN Detail": ["SEN detail", "SEND detail"],
+            "Ethnicity": ["Ethnicity"],
+            "EAL": ["EAL", "EAL Status"],
+            "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium"],
+            "SATs Reading": ["SATs Reading", "SAT's Reading", "Reading Score"],
+            "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
+        }
 
-            with right_tab:
-                for col in extra_cols[10:]:
-                    st.markdown(f"**{col}:** {row[col]}")
+        table_html = "<table style='width:100%; border-collapse: collapse;'>"
 
+        for label, keys in info.items():
+            table_html += f"""
+            <tr>
+                <td style='border:1px solid #ddd; padding:8px;'>
+                    <strong>{label}:</strong> {get_val(row, keys)}
+                </td>
+            </tr>
+            """
 
-# ---------------------------
-# YEAR 7 SUBJECT REPORT
-# ---------------------------
-def render_subject_report(filtered_df):
-    st.subheader("📊 Year 7 Academic Subject Reports")
+        table_html += "</table>"
 
-    for _, row in filtered_df.iterrows():
-        with st.container():
-            render_student_header(row, "Academic Progress Report", "Year 7")
-            st.write("---")
-
-            metric1, metric2 = st.columns(2)
-            metric1.metric("Current Grade", row.get("Current Grade", "N/A"))
-            metric2.metric("Target Grade", row.get("Target Grade", "N/A"))
-            st.write("---")
-
-            render_student_summary(row)
-            st.write("---")
-
-            # Subject breakdown
-            subject_data = {}
-            for col in filtered_df.columns:
-                col_lower = col.lower()
-                if any(term in col_lower for term in ["subject", "grade", "score"]) \
-                        and not any(term in col_lower for term in ["target", "current", "maths", "reading"]):
-                    subject_data[col] = row[col]
-
-            if subject_data:
-                summary_df = pd.DataFrame.from_dict(
-                    subject_data,
-                    orient="index",
-                    columns=["Assigned Level / Progress Tracker"]
-                )
-                st.dataframe(summary_df, use_container_width=True)
-            else:
-                st.caption("*No subject performance data found*")
+        st.markdown(table_html, unsafe_allow_html=True)
 
 
 # ---------------------------
-# YEAR 9 TRANSITION REPORT
+# YEAR 7 PASSPORTS
 # ---------------------------
-def render_y9_transition(filtered_df):
-    st.subheader("📁 Year 9 Transition Profiles")
+def render_y7_passports(df):
+    st.title("📘 Year 7 Passports")
 
-    for _, row in filtered_df.iterrows():
-        with st.container():
-            render_student_header(row, "Year 9 Transition Profile", "Year 9")
-            st.write("---")
+    if df is None or df.empty:
+        st.warning("No students to display.")
+        return
 
-            display_cols = [c for c in filtered_df.columns if c not in ["Full Name", "DoB"]]
-            col1, col2 = st.columns(2)
-
-            for i, col in enumerate(display_cols):
-                target = col1 if i % 2 == 0 else col2
-                target.markdown(f"**{col}:** {row[col]}")
+    for _, row in df.iterrows():
+        render_passport(row, cohort="Year 7", title="Year 7 Passport")
 
 
 # ---------------------------
-# YEAR 9 FULL REPORT
+# YEAR 9 TRANSITION
 # ---------------------------
-def render_y9_full(filtered_df):
-    st.subheader("💯 Full Year 9 Reports")
+def render_y9_transition(df):
+    st.title("📁 Year 9 Transition Profiles")
 
-    for _, row in filtered_df.iterrows():
-        with st.container():
-            render_student_header(row, "Full Holistic Record", "Year 9")
-            st.write("---")
+    if df is None or df.empty:
+        st.warning("No students to display.")
+        return
 
-            all_cols = [c for c in filtered_df.columns if c not in ["Full Name", "DoB"]]
-            col1, col2, col3 = st.columns(3)
+    for _, row in df.iterrows():
+        render_passport(row, cohort="Year 9", title="Year 9 Transition Profile")
 
-            for i, col in enumerate(all_cols):
-                text = f"📌 **{col}:** {row[col]}"
-                if i % 3 == 0:
-                    col1.markdown(text)
-                elif i % 3 == 1:
-                    col2.markdown(text)
-                else:
-                    col3.markdown(text)
+
+# ---------------------------
+# OPTIONAL EXTENSION (SAFE PLACEHOLDER)
+# ---------------------------
+def render_subject_report(df):
+    """Kept for compatibility (not used in your cleaned app)"""
+    st.title("Subject Report")
+    st.info("This module is currently disabled in the simplified version.")
