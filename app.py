@@ -178,6 +178,7 @@ if page == "Student Search":
 
 elif page == "Year 7 Passports":
     # ------------------ FILTERS ------------------
+    
 form_groups = sorted(df["Form Group"].dropna().unique()) if "Form Group" in df.columns else []
 maths_sets = sorted(df["Maths Set"].dropna().unique()) if "Maths Set" in df.columns else []
 
