@@ -6,9 +6,7 @@ import os
 from modules.data_loader import load_data
 from modules.report_renderers import (
     render_y7_passports,
-    render_subject_report,
     render_y9_transition,
-    render_y9_full
 )
 
 # ---------------------------
@@ -38,9 +36,7 @@ page = st.sidebar.radio(
     [
         "Student Search",
         "Year 7 Passports",
-        "Year 7 Reports",
         "Year 9 Transition",
-        "Year 9 Full Reports",
         "Analytics"
     ]
 )
@@ -194,14 +190,9 @@ if page == "Student Search":
 elif page == "Year 7 Passports":
     render_y7_passports(df)
 
-elif page == "Year 7 Reports":
-    render_subject_report(df)
-
 elif page == "Year 9 Transition":
     render_y9_transition(df)
 
-elif page == "Year 9 Full Reports":
-    render_y9_full(df)
 
 elif page == "Analytics":
     analytics(df)
