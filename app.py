@@ -109,8 +109,6 @@ def analytics(df_y7, df_y10):
 
     sen_count = count_active(["SEN Status", "SEND Status"])
     eal_count = count_active(["EAL", "EAL Status"])
-    
-    # Added "Disadvantaged (PP)" exactly as it appears
     pp_count = count_active([
         "Disadvantaged (PP)", "Premium", "Disadvantaged", "Pupil Premium", "PP", 
         "FSM", "Ever 6", "FSM6", "Pupil Premium Indicator"
@@ -125,48 +123,38 @@ def analytics(df_y7, df_y10):
 
     st.write("---")
 
-    # --- GRAPHS WITH NUMERICAL BATCHING ---
+    # --- GRAPHS WITH FIXED AXES ---
     st.subheader("📈 KS2 / SATs Performance")
     g1, g2 = st.columns(2)
     
     read_col = next((c for c in df.columns if c.strip().lower() in ["ks2 read", "ks2 reading", "sats reading", "reading score"]), None)
     math_col = next((c for c in df.columns if c.strip().lower() in ["ks2 maths", "ks2 math", "sats maths", "maths score"]), None)
     
+    # Official UK KS2 Scaled Score Bins (Locked)
+    ks2_bins = [80, 85, 90, 95, 100, 105, 110, 115, 121] 
+    ks2_labels = ["80-84", "85-89", "90-94", "95-99", "100-104", "105-109", "110-114", "115-120"]
+    
     with g1:
         if math_col:
-            st.markdown("**Maths Distribution (Batches of 5)**")
+            st.markdown("**Maths Distribution**")
             math_nums = pd.to_numeric(df[math_col], errors='coerce').dropna()
             
-            if not math_nums.empty:
-                min_score = int((math_nums.min() // 5) * 5)
-                max_score = int((math_nums.max() // 5) * 5) + 5
-                bins = list(range(min_score, max_score + 5, 5))
-                labels = [f"{bins[i]}-{bins[i]+4}" for i in range(len(bins)-1)]
-                
-                math_binned = pd.cut(math_nums, bins=bins, labels=labels, right=False)
-                math_counts = math_binned.value_counts().sort_index()
-                st.bar_chart(math_counts)
-            else:
-                st.caption("*(No numeric Maths data available)*")
+            math_binned = pd.cut(math_nums, bins=ks2_bins, labels=ks2_labels, right=False)
+            # Reindex forces Streamlit to draw the x-axis for ALL labels, even if the count is 0
+            math_counts = math_binned.value_counts().reindex(ks2_labels, fill_value=0)
+            st.bar_chart(math_counts)
         else:
             st.caption("*(No Maths data available)*")
             
     with g2:
         if read_col:
-            st.markdown("**Reading Distribution (Batches of 5)**")
+            st.markdown("**Reading Distribution**")
             read_nums = pd.to_numeric(df[read_col], errors='coerce').dropna()
             
-            if not read_nums.empty:
-                min_score = int((read_nums.min() // 5) * 5)
-                max_score = int((read_nums.max() // 5) * 5) + 5
-                bins = list(range(min_score, max_score + 5, 5))
-                labels = [f"{bins[i]}-{bins[i]+4}" for i in range(len(bins)-1)]
-                
-                read_binned = pd.cut(read_nums, bins=bins, labels=labels, right=False)
-                read_counts = read_binned.value_counts().sort_index()
-                st.bar_chart(read_counts)
-            else:
-                st.caption("*(No numeric Reading data available)*")
+            read_binned = pd.cut(read_nums, bins=ks2_bins, labels=ks2_labels, right=False)
+            # Reindex forces Streamlit to draw the x-axis for ALL labels, even if the count is 0
+            read_counts = read_binned.value_counts().reindex(ks2_labels, fill_value=0)
+            st.bar_chart(read_counts)
         else:
             st.caption("*(No Reading data available)*")
 
