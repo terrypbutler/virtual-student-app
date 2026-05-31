@@ -13,6 +13,9 @@ def get_flexible_text(row, possible_names):
             val = str(row[row_keys[clean_name]]).strip()
             # If the value is empty or N/A, ignore it completely
             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
+                # Strip out the ".0" that Pandas adds to numbers
+                if val.endswith(".0"):
+                    val = val[:-2]
                 return val
     return None
 
@@ -37,12 +40,21 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                         if str(row_key).strip().lower() == str(k).strip().lower():
                             val = str(row[row_key]).strip()
                             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL"]:
+                                # Strip out the ".0" that Pandas adds to numbers
+                                if val.endswith(".0"):
+                                    val = val[:-2]
+                                # Add a % sign automatically if it's the attendance metric
+                                if "attendance" in str(k).lower() and "%" not in val:
+                                    val = f"{val}%"
                                 return val
                 return "" # Returns a perfect blank instead of N/A
 
+            # Added Attendance % and Suspension days
             info = {
                 "Form Group": ["Form Tutor", "Tutor", "Form Group"],
                 "Gender": ["Gender"],
+                "Attendance": ["Attendance %", "Attendance"],
+                "Suspensions": ["Suspension days", "Suspensions", "Suspension Days"],
                 "SEN Status": ["SEN Status", "SEND Status"],
                 "SEN Detail": ["SEN detail", "SEND detail"],
                 "Ethnicity": ["Ethnicity"],
