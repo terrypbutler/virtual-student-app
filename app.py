@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-from PIL import Image
-import os
+from modules.data_loader import load_data
 from modules.report_renderers import render_student_card, render_photo_grid
 
 def safe_unique(df, col):
@@ -9,35 +8,6 @@ def safe_unique(df, col):
         return sorted(df[col].dropna().astype(str).unique().tolist())
     return []
 
-from modules.data_loader import load_data
-from modules.report_renderers import render_student_card
-# --------------------------- SAFE IMAGE LOADER ---------------------------
-import os
-from PIL import Image
-
-def load_student_image(name, cohort):
-    folder = "photos"
-
-    if not os.path.exists(folder):
-        return None
-
-    safe_name = str(name).strip().lower()
-    safe_name = " ".join(safe_name.split())  # removes double spaces
-    safe_name = safe_name.replace(".", "")
-
-    expected_file = f"{safe_name}.png"
-
-    files = {f.lower(): f for f in os.listdir(folder)}
-
-    if expected_file not in files:
-        return None
-
-    path = os.path.join(folder, files[expected_file])
-
-    try:
-        return Image.open(path)
-    except:
-        return None
 # ---------------------------
 # CONFIG
 # ---------------------------
@@ -69,86 +39,6 @@ page = st.sidebar.radio(
 )
 
 # ---------------------------
-# STUDENT PASSPORT RENDERER
-# ---------------------------
-def render_student_passport(student_row, cohort):
-    import streamlit as st
-    import os
-    from PIL import Image
-
-    NAME_COLUMN = "Full Name"
-    DOB_COLUMN = "DoB"
-
-    s_name = str(student_row.get(NAME_COLUMN, "Unknown Student"))
-    s_dob = str(student_row.get(DOB_COLUMN, "")).strip()
-    header = f"{s_name} ({s_dob})" if s_dob else s_name
-
-    with st.expander(f"👤 {header}"):
-
-        left, right = st.columns([3, 1])
-
-        # ---------------- LEFT (DETAILS) ----------------
-        with left:
-
-            def get_val(keys):
-                for k in keys:
-                    if k in student_row and str(student_row[k]).strip():
-                        return student_row[k]
-                return "N/A"
-
-            info = {
-                "Form Group": ["Form Tutor", "Tutor", "Form Group"],
-                "Gender": ["Gender"],
-                "SEN Status": ["SEN Status", "SEND Status"],
-                "SEN Detail": ["SEN detail", "SEND detail"],
-                "Ethnicity": ["Ethnicity"],
-                "EAL": ["EAL", "EAL Status"],
-                "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium"],
-                "SATs Reading": ["SATs Reading", "SAT's Reading", "Reading Score"],
-                "SATs Maths": ["SATs Maths", "SAT's Maths", "Maths Score"]
-            }
-
-            cols = st.columns(2)
-
-            items = list(info.items())
-            for i, (label, keys) in enumerate(items):
-                value = get_val(keys)
-                cols[i % 2].metric(label, value)
-
-        # ---------------- RIGHT (PHOTO) ----------------
-        with right:
-            photo_folder = "photos"
-
-            if os.path.exists(photo_folder):
-                try:
-                    safe_name = s_name.strip().replace(".", "").lower()
-                    filename = f"{safe_name}.png"
-
-                    files = {f.lower(): f for f in os.listdir(photo_folder)}
-
-                    if filename in files:
-                        img = Image.open(os.path.join(photo_folder, files[filename]))
-                        w, h = img.size
-
-                        trim = int(h * 0.08)
-                        top = trim
-                        bottom = h - trim
-
-                        if cohort == "Year 7":
-                            crop = (0, top, w // 2, bottom)
-                        else:
-                            crop = (w // 2, top, w, bottom)
-
-                        img = img.crop(crop)
-                        st.image(img, width=140)
-                    else:
-                        st.caption("Photo missing")
-
-                except:
-                    st.caption("Image error")
-            else:
-                st.caption("No photo folder")
-# ---------------------------
 # SEARCH PAGE
 # ---------------------------
 def student_search(df):
@@ -163,7 +53,7 @@ def student_search(df):
             st.warning("No matches found.")
 
         for _, row in results.iterrows():
-            render_student_passport(row, selected_cohort)
+            render_student_card(row, selected_cohort, show_subjects=True, show_projected=True)
 
 
 # ---------------------------
@@ -202,33 +92,20 @@ def analytics(df):
 if page == "Student Search":
     student_search(df)
 
-
-    # ------------------ FILTERS ------------------
-    
+# ------------------ YEAR 7 ------------------
 elif page == "Year 7 Passports":
-
     st.sidebar.subheader("🔎 Filters (Year 7)")
 
     form_groups = safe_unique(df, "Form Group")
     maths_sets = safe_unique(df, "Maths Set")
 
-    selected_form = st.sidebar.multiselect(
-        "Form Group (ALL by default)",
-        form_groups,
-        key="y7_form"
-    )
-
-    selected_math = st.sidebar.multiselect(
-        "Maths Set (ALL by default)",
-        maths_sets,
-        key="y7_math"
-    )
+    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", form_groups, key="y7_form")
+    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", maths_sets, key="y7_math")
 
     filtered_df = df.copy()
 
     if selected_form:
         filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
-
     if selected_math:
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
@@ -236,39 +113,27 @@ elif page == "Year 7 Passports":
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     
-    # Create the tabs
-    tab1, tab2 = st.tabs(["📄 Detailed Passports", "📸 Photo Grid"])
+    # 1. Render the Grid First
+    render_photo_grid(filtered_df, "Year 7", num_cols=5)
     
-    with tab1:
-        for _, row in filtered_df.iterrows():
-            render_student_card(row, "Year 7", show_subjects=show_subs, show_projected=True)
-            
-    with tab2:
-        render_photo_grid(filtered_df, "Year 7", num_cols=5)
+    # Visual separator
+    st.divider()
+    st.subheader("📄 Detailed Passports")
     
+    # 2. Render the Detailed Cards Below
     for _, row in filtered_df.iterrows():
         render_student_card(row, "Year 7", show_subjects=show_subs, show_projected=True)
 
+# ------------------ YEAR 9 ------------------
 elif page == "Year 9 Transition":
-
     st.sidebar.subheader("🔎 Filters (Year 9)")
 
     form_groups = safe_unique(df, "Form Group")
     maths_sets = safe_unique(df, "Maths Set")
 
-    selected_form = st.sidebar.multiselect(
-        "Form Group (ALL by default)",
-        form_groups,
-        key="y9_form"
-    )
+    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", form_groups, key="y9_form")
+    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", maths_sets, key="y9_math")
 
-    selected_math = st.sidebar.multiselect(
-        "Maths Set (ALL by default)",
-        maths_sets,
-        key="y9_math"
-    )
-
-    # subject dropdown (optional)
     subject_cols = [
         "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design",
         "Drama","Geography","History","Hospitality","Music","Photography",
@@ -277,20 +142,14 @@ elif page == "Year 9 Transition":
 
     available_subjects = [c for c in subject_cols if c in df.columns]
 
-    selected_subject = st.sidebar.selectbox(
-        "Subject (optional)",
-        ["All Subjects"] + available_subjects,
-        key="y9_subject"
-    )
+    selected_subject = st.sidebar.selectbox("Subject (optional)", ["All Subjects"] + available_subjects, key="y9_subject")
 
     filtered_df = df.copy()
 
     if selected_form:
         filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
-
     if selected_math:
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
-
     if selected_subject != "All Subjects":
         filtered_df = filtered_df[
             filtered_df[selected_subject].notna() &
@@ -301,19 +160,17 @@ elif page == "Year 9 Transition":
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     
-    # Create the tabs
-    tab1, tab2 = st.tabs(["📄 Detailed Passports", "📸 Photo Grid"])
+    # 1. Render the Grid First
+    render_photo_grid(filtered_df, "Year 9", num_cols=5)
     
-    with tab1:
-        for _, row in filtered_df.iterrows():
-            render_student_card(row, "Year 9", show_subjects=is_full_report, show_projected=is_full_report)
-            
-    with tab2:
-        render_photo_grid(filtered_df, "Year 9", num_cols=5)
+    # Visual separator
+    st.divider()
+    st.subheader("📄 Detailed Passports")
     
+    # 2. Render the Detailed Cards Below
     for _, row in filtered_df.iterrows():
         render_student_card(row, "Year 9", show_subjects=is_full_report, show_projected=is_full_report)
 
+# ------------------ ANALYTICS ------------------
 elif page == "Analytics":
     analytics(df)
-    
