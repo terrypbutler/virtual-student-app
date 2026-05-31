@@ -55,7 +55,6 @@ def student_search(df):
         for _, row in results.iterrows():
             render_student_card(row, selected_cohort, show_subjects=True, show_projected=True)
 
-
 # ---------------------------
 # ANALYTICS
 # ---------------------------
@@ -85,7 +84,6 @@ def analytics(df):
     st.subheader("Raw Data")
     st.dataframe(df, use_container_width=True)
 
-
 # ---------------------------
 # ROUTING & FILTERS
 # ---------------------------
@@ -109,7 +107,17 @@ elif page == "Year 7 Passports":
     if selected_math:
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
-    show_subs = st.sidebar.checkbox("Include Subject Reports", value=False)
+    # --- NEW REPORT SELECTOR ---
+    report_option = st.sidebar.radio(
+        "Select Report Detail",
+        ["Base Passport (No Details)", "Short Report (Portrait & Home Life)", "Detailed Report (All Subjects)"]
+    )
+
+    y7_mode = "None"
+    if report_option == "Short Report (Portrait & Home Life)":
+        y7_mode = "Short"
+    elif report_option == "Detailed Report (All Subjects)":
+        y7_mode = "Detailed"
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     
@@ -122,7 +130,7 @@ elif page == "Year 7 Passports":
     
     # 2. Render the Detailed Cards Below
     for _, row in filtered_df.iterrows():
-        render_student_card(row, "Year 7", show_subjects=show_subs, show_projected=True)
+        render_student_card(row, "Year 7", show_projected=True, y7_report_type=y7_mode)
 
 # ------------------ YEAR 9 ------------------
 elif page == "Year 9 Transition":
