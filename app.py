@@ -99,7 +99,8 @@ def analytics(df_y7, df_y10):
         ]
 
     # --- CALCULATE METRICS ---
-    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN"]
+    # Added 0 and 0.0 to catch numerical 'False' flags
+    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
     
     def count_active(col_names):
         col = next((c for c in df.columns if c.strip().lower() in [n.lower() for n in col_names]), None)
@@ -109,7 +110,12 @@ def analytics(df_y7, df_y10):
 
     sen_count = count_active(["SEN Status", "SEND Status"])
     eal_count = count_active(["EAL", "EAL Status"])
-    pp_count = count_active(["Premium", "Disadvantaged", "Pupil Premium", "PP"])
+    
+    # Expanded the net to catch any possible name for Pupil Premium
+    pp_count = count_active([
+        "Premium", "Disadvantaged", "Pupil Premium", "PP", 
+        "FSM", "Ever 6", "FSM6", "Pupil Premium Indicator"
+    ])
 
     st.subheader(f"Overview: {len(df)} Students")
     m1, m2, m3, m4 = st.columns(4)
@@ -130,17 +136,14 @@ def analytics(df_y7, df_y10):
     with g1:
         if math_col:
             st.markdown("**Maths Distribution (Batches of 5)**")
-            # Force values to numeric format to eliminate text/empty anomalies
             math_nums = pd.to_numeric(df[math_col], errors='coerce').dropna()
             
             if not math_nums.empty:
-                # Group numbers into dynamic steps of 5
                 min_score = int((math_nums.min() // 5) * 5)
                 max_score = int((math_nums.max() // 5) * 5) + 5
                 bins = list(range(min_score, max_score + 5, 5))
                 labels = [f"{bins[i]}-{bins[i]+4}" for i in range(len(bins)-1)]
                 
-                # Cut data and sort by range index order
                 math_binned = pd.cut(math_nums, bins=bins, labels=labels, right=False)
                 math_counts = math_binned.value_counts().sort_index()
                 st.bar_chart(math_counts)
@@ -152,17 +155,14 @@ def analytics(df_y7, df_y10):
     with g2:
         if read_col:
             st.markdown("**Reading Distribution (Batches of 5)**")
-            # Force values to numeric format to eliminate text/empty anomalies
             read_nums = pd.to_numeric(df[read_col], errors='coerce').dropna()
             
             if not read_nums.empty:
-                # Group numbers into dynamic steps of 5
                 min_score = int((read_nums.min() // 5) * 5)
                 max_score = int((read_nums.max() // 5) * 5) + 5
                 bins = list(range(min_score, max_score + 5, 5))
                 labels = [f"{bins[i]}-{bins[i]+4}" for i in range(len(bins)-1)]
                 
-                # Cut data and sort by range index order
                 read_binned = pd.cut(read_nums, bins=bins, labels=labels, right=False)
                 read_counts = read_binned.value_counts().sort_index()
                 st.bar_chart(read_counts)
