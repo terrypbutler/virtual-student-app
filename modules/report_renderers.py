@@ -11,17 +11,15 @@ def get_flexible_text(row, possible_names):
         clean_name = name.lower().strip()
         if clean_name in row_keys:
             val = str(row[row_keys[clean_name]]).strip()
-            # If the value is empty or N/A, ignore it completely
             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
-                # Strip out the ".0" that Pandas adds to numbers
                 if val.endswith(".0"):
                     val = val[:-2]
                 return val
     return None
 
-def render_student_card(row, cohort, show_subjects=False, show_projected=True, y7_report_type="None"):
+def render_student_card(row, cohort, show_projected=True, report_type="None"):
     """
-    Master rendering function. Adapts to Y7/Y10 and specific report requirements.
+    Master rendering function. Adapts to Y7/Y10 and specific 3-tier report requirements.
     """
     name = row.get("Full Name", "Unknown")
     
@@ -33,23 +31,19 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
         with left:
             st.markdown(f"### {cohort} Profile")
             
-            # Smart Summary Generator
             def get_val(keys):
                 for k in keys:
                     for row_key in row.keys():
                         if str(row_key).strip().lower() == str(k).strip().lower():
                             val = str(row[row_key]).strip()
                             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL"]:
-                                # Strip out the ".0" that Pandas adds to numbers
                                 if val.endswith(".0"):
                                     val = val[:-2]
-                                # Add a % sign automatically if it's the attendance metric
                                 if "attendance" in str(k).lower() and "%" not in val:
                                     val = f"{val}%"
                                 return val
-                return "" # Returns a perfect blank instead of N/A
+                return ""
 
-            # Added Attendance % and Suspension days
             info = {
                 "Form Group": ["Form Tutor", "Tutor", "Form Group"],
                 "Gender": ["Gender"],
@@ -82,21 +76,25 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 st.info(f"**Overall Projected Grade:** {proj}")
                 
         # --- 4. YEAR 7 CUSTOM REPORTS ---
-        if cohort == "Year 7" and y7_report_type != "None":
+        if cohort == "Year 7" and report_type != "None":
             st.divider()
-            st.markdown(f"### 📑 {y7_report_type} Report")
+            st.markdown(f"### 📑 {report_type} Report")
             
             portrait = get_flexible_text(row, ["Transition Portrait", "Transition portrait", "Portrait"])
             if portrait:
                 st.markdown("**Transition Portrait:**")
                 st.write(portrait)
+            elif report_type == "Detailed":
+                st.caption("*(No Transition Portrait data found in spreadsheet)*")
                 
             home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Home life & interests", "Interests"])
             if home_life:
                 st.markdown("**Home Life & Interests:**")
                 st.write(home_life)
+            elif report_type == "Detailed":
+                st.caption("*(No Home Life data found in spreadsheet)*")
                 
-            if y7_report_type == "Detailed":
+            if report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
                 y7_subjects = ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"]
                 
@@ -109,58 +107,69 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 if available_y7:
                     st.table(available_y7)
 
-        # --- 5. YEAR 10 SUBJECT REPORTS (3-Column Table) ---
-        elif show_subjects and cohort == "Year 10":
-            st.subheader("Subject Reports")
-            subject_cols = [
-                "Eng Lang","Eng Lit","Maths","Science","Art","Computing",
-                "Design","Drama","Geography","History","Hospitality","Music",
-                "Photography","Spanish","Sport"
-            ]
-            
-            table_data = []
-            
-            # Grab the global predicted grade as a fallback
-            global_pred = get_flexible_text(row, ["Projected Grade", "Predicted Grade"]) or ""
-            
-            for sub in subject_cols:
-                grade = get_flexible_text(row, [sub])
-                
-                if grade: # Only list the subject if they have a current grade for it
-                    
-                    # SPECIAL RULE FOR SCIENCE (Combining Sci 1 and Sci 2)
-                    if sub.lower() == "science":
-                        sci1 = get_flexible_text(row, ["Sci 1 Predicted Grade", "Sci 1 Predicted"])
-                        sci2 = get_flexible_text(row, ["Sci 2 Predicted Grade", "Sci 2 Predicted"])
-                        
-                        if sci1 and sci2:
-                            sub_pred = f"{sci1}-{sci2}"
-                        elif sci1:
-                            sub_pred = sci1
-                        elif sci2:
-                            sub_pred = sci2
-                        else:
-                            # Fallback if the columns aren't split
-                            sub_pred = get_flexible_text(row, ["Science Predicted Grade", "Science Predicted"])
-                    
-                    # STANDARD RULE FOR ALL OTHER SUBJECTS
-                    else:
-                        sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade", f"{sub} Predicted", f"Predicted {sub}"])
-                    
-                    # Use specific prediction, otherwise global prediction, otherwise blank
-                    final_pred = sub_pred if sub_pred else global_pred
-                    
-                    table_data.append({
-                        "Subject": sub,
-                        "Current Grade": grade,
-                        "Predicted Grade": final_pred
-                    })
-            
-            if table_data:
-                # Convert the data into a beautiful Pandas DataFrame table
-                df_subjects = pd.DataFrame(table_data)
-                st.table(df_subjects.set_index("Subject"))
+        # --- 5. YEAR 10 CUSTOM REPORTS ---
+        elif cohort == "Year 10" and report_type != "None":
+            st.divider()
+            st.markdown(f"### 📑 {report_type} Report")
 
+            # Add KS3 Report
+            ks3_report = get_flexible_text(row, ["Key Stage 3 Report", "KS3 Report", "Key Stage 3"])
+            if ks3_report:
+                st.markdown("**Key Stage 3 Report:**")
+                st.write(ks3_report)
+            elif report_type == "Detailed":
+                st.caption("*(No Key Stage 3 Report data found in spreadsheet)*")
+
+            # Add Home Life
+            home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Home life & interests", "Interests"])
+            if home_life:
+                st.markdown("**Home Life & Interests:**")
+                st.write(home_life)
+            elif report_type == "Detailed":
+                st.caption("*(No Home Life data found in spreadsheet)*")
+
+            # Build 3-column table if Detailed
+            if report_type == "Detailed":
+                st.markdown("**Subject Overviews:**")
+                subject_cols = [
+                    "Eng Lang","Eng Lit","Maths","Science","Art","Computing",
+                    "Design","Drama","Geography","History","Hospitality","Music",
+                    "Photography","Spanish","Sport"
+                ]
+                
+                table_data = []
+                global_pred = get_flexible_text(row, ["Projected Grade", "Predicted Grade"]) or ""
+                
+                for sub in subject_cols:
+                    grade = get_flexible_text(row, [sub])
+                    
+                    if grade: 
+                        if sub.lower() == "science":
+                            sci1 = get_flexible_text(row, ["Sci 1 Predicted Grade", "Sci 1 Predicted"])
+                            sci2 = get_flexible_text(row, ["Sci 2 Predicted Grade", "Sci 2 Predicted"])
+                            
+                            if sci1 and sci2:
+                                sub_pred = f"{sci1}-{sci2}"
+                            elif sci1:
+                                sub_pred = sci1
+                            elif sci2:
+                                sub_pred = sci2
+                            else:
+                                sub_pred = get_flexible_text(row, ["Science Predicted Grade", "Science Predicted"])
+                        else:
+                            sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade", f"{sub} Predicted", f"Predicted {sub}"])
+                        
+                        final_pred = sub_pred if sub_pred else global_pred
+                        
+                        table_data.append({
+                            "Subject": sub,
+                            "Current Grade": grade,
+                            "Predicted Grade": final_pred
+                        })
+                
+                if table_data:
+                    df_subjects = pd.DataFrame(table_data)
+                    st.table(df_subjects.set_index("Subject"))
 
 def render_photo_grid(df, cohort, num_cols=5):
     """
@@ -233,3 +242,4 @@ def render_photo_grid(df, cohort, num_cols=5):
                     st.markdown(details_html, unsafe_allow_html=True)
         
         st.write("---")
+        
