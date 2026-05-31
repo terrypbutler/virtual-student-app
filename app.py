@@ -123,7 +123,7 @@ def analytics(df_y7, df_y10):
 
     st.write("---")
 
-    # --- GRAPHS WITH FIXED AXES ---
+    # --- GRAPHS WITH FIXED, CATEGORICAL AXES ---
     st.subheader("📈 KS2 / SATs Performance")
     g1, g2 = st.columns(2)
     
@@ -140,9 +140,13 @@ def analytics(df_y7, df_y10):
             math_nums = pd.to_numeric(df[math_col], errors='coerce').dropna()
             
             math_binned = pd.cut(math_nums, bins=ks2_bins, labels=ks2_labels, right=False)
-            # Reindex forces Streamlit to draw the x-axis for ALL labels, even if the count is 0
             math_counts = math_binned.value_counts().reindex(ks2_labels, fill_value=0)
-            st.bar_chart(math_counts)
+            
+            # Pack into a DataFrame and lock the order using Categorical so Streamlit can't sort it alphabetically
+            df_math = pd.DataFrame({"Score Range": ks2_labels, "Students": math_counts.values})
+            df_math["Score Range"] = pd.Categorical(df_math["Score Range"], categories=ks2_labels, ordered=True)
+            
+            st.bar_chart(df_math, x="Score Range", y="Students")
         else:
             st.caption("*(No Maths data available)*")
             
@@ -152,9 +156,13 @@ def analytics(df_y7, df_y10):
             read_nums = pd.to_numeric(df[read_col], errors='coerce').dropna()
             
             read_binned = pd.cut(read_nums, bins=ks2_bins, labels=ks2_labels, right=False)
-            # Reindex forces Streamlit to draw the x-axis for ALL labels, even if the count is 0
             read_counts = read_binned.value_counts().reindex(ks2_labels, fill_value=0)
-            st.bar_chart(read_counts)
+            
+            # Pack into a DataFrame and lock the order using Categorical
+            df_read = pd.DataFrame({"Score Range": ks2_labels, "Students": read_counts.values})
+            df_read["Score Range"] = pd.Categorical(df_read["Score Range"], categories=ks2_labels, ordered=True)
+            
+            st.bar_chart(df_read, x="Score Range", y="Students")
         else:
             st.caption("*(No Reading data available)*")
 
@@ -266,4 +274,4 @@ elif page == "Year 10":
 
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
-    analytics(df_y7, df_y10)
+    analytics(df_y7, df_y10)#
