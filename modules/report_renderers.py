@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from modules.photo_utils import display_student_photo
-from modules.helpers import get_field
 
 def get_flexible_text(row, possible_names):
     """Helper to find columns and strip out N/A values completely."""
@@ -17,13 +16,15 @@ def get_flexible_text(row, possible_names):
                 return val
     return None
 
-def render_student_card(row, cohort, show_projected=True, report_type="None"):
+def render_student_card(row, cohort, show_projected=True, report_type="None", is_print_mode=False):
     """
     Master rendering function. Adapts to Y7/Y10 and specific 3-tier report requirements.
+    Added is_print_mode to force expanders open for PDF printing.
     """
     name = row.get("Full Name", "Unknown")
     
-    with st.expander(f"👤 {name}"):
+    # If print mode is on, force the expander open!
+    with st.expander(f"👤 {name}", expanded=is_print_mode):
         
         # --- 1. HEADER & SUMMARY DASHBOARD ---
         left, right = st.columns([3, 1])
@@ -53,7 +54,7 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
                 "SEN Detail": ["SEN detail", "SEND detail"],
                 "Ethnicity": ["Ethnicity"],
                 "EAL": ["EAL", "EAL Status"],
-                "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium", "PP"],
+                "Disadvantaged": ["Disadvantaged (PP)", "Premium", "Disadvantaged", "Pupil Premium", "PP"],
                 "KS2 Reading": ["KS2 Read", "KS2 Reading", "SATs Reading"], 
                 "KS2 Maths": ["KS2 Maths", "KS2 Math", "SATs Maths"]        
             }
@@ -63,8 +64,6 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
             for i, (label, keys) in enumerate(items):
                 value = get_val(keys)
                 
-                # --- NEW TEXT-WRAPPING HTML METRIC ---
-                # This replaces st.metric to prevent truncation
                 html_card = f"""
                 <div style='margin-bottom: 12px; line-height: 1.3;'>
                     <span style='font-size: 0.85em; opacity: 0.7;'>{label}</span><br>
@@ -78,7 +77,6 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
             
         st.divider()
         
-        # 3. Projected Grades (Global)
         if show_projected:
             proj = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
             if proj:
@@ -185,18 +183,22 @@ def render_photo_grid(df, cohort, num_cols=5):
         st.warning("No students found for this selection.")
         return
 
-    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN"]
+    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
 
     sen_count = 0
     eal_count = 0
     pp_count = 0
 
     for _, row in df.iterrows():
-        if str(get_field(row, "sen_status")).strip().upper() not in ignore_list:
+        sen_val = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
+        eal_val = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
+        pp_val = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP", "Premium"]) or ""
+        
+        if sen_val.upper() not in ignore_list:
             sen_count += 1
-        if str(get_field(row, "eal")).strip().upper() not in ignore_list:
+        if eal_val.upper() not in ignore_list:
             eal_count += 1
-        if str(get_field(row, "pp")).strip().upper() not in ignore_list:
+        if pp_val.upper() not in ignore_list:
             pp_count += 1
 
     st.markdown("### 📊 Selection Overview")
@@ -217,10 +219,10 @@ def render_photo_grid(df, cohort, num_cols=5):
             with col:
                 name = row.get("Full Name", "Unknown")
                 
-                sen_status = str(get_field(row, "sen_status")).strip()
-                sen_detail = str(get_field(row, "sen_detail")).strip()
-                pp_status = str(get_field(row, "pp")).strip()
-                eal_status = str(get_field(row, "eal")).strip()
+                sen_status = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
+                sen_detail = get_flexible_text(row, ["SEN detail", "SEND detail"]) or ""
+                eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
+                pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP", "Premium"]) or ""
                 
                 sen_active = sen_status.upper() not in ignore_list
                 pp_active = pp_status.upper() not in ignore_list
