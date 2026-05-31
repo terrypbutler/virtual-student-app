@@ -40,6 +40,27 @@ page = st.sidebar.radio(
 )
 
 # ---------------------------
+# CSS PRINT INJECTION
+# ---------------------------
+def inject_print_css():
+    st.markdown("""
+        <style>
+        @media print {
+            /* Hide the sidebar and top navigation bars */
+            section[data-testid="stSidebar"] { display: none !important; }
+            header[data-testid="stHeader"] { display: none !important; }
+            footer { display: none !important; }
+            
+            /* Remove margins so content stretches */
+            .stApp { margin-top: -50px !important; }
+            
+            /* Hide the expander toggle arrows */
+            svg[data-testid="stExpanderToggleIcon"] { display: none !important; }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+# ---------------------------
 # SEARCH PAGE
 # ---------------------------
 def student_search(df_y7, df_y10):
@@ -72,7 +93,6 @@ def analytics(df_y7, df_y10):
 
     st.sidebar.subheader("🔎 Analytics Filters")
 
-    # --- FILTERS ---
     form_groups = safe_unique(df_base, "Form Group")
     maths_sets = safe_unique(df_base, "Maths Set")
 
@@ -87,7 +107,6 @@ def analytics(df_y7, df_y10):
     available_subjects = [c for c in subject_cols if c in df_base.columns]
     selected_subject = st.sidebar.selectbox("Option Class (optional)", ["All Subjects"] + available_subjects, key="ana_sub")
 
-    # --- APPLY FILTERS ---
     df = df_base.copy()
     if selected_form:
         df = df[df["Form Group"].astype(str).isin(selected_form)]
@@ -99,7 +118,6 @@ def analytics(df_y7, df_y10):
             (df[selected_subject].astype(str).str.strip() != "")
         ]
 
-    # --- CALCULATE METRICS ---
     ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
     
     def count_active(col_names):
@@ -124,7 +142,6 @@ def analytics(df_y7, df_y10):
 
     st.write("---")
 
-    # --- GRAPHS WITH FIXED, CATEGORICAL AXES (ALTAIR) ---
     st.subheader("📈 KS2 / SATs Performance")
     g1, g2 = st.columns(2)
     
@@ -138,7 +155,6 @@ def analytics(df_y7, df_y10):
         if math_col:
             st.markdown("**Maths Distribution**")
             math_nums = pd.to_numeric(df[math_col], errors='coerce').dropna()
-            
             math_binned = pd.cut(math_nums, bins=ks2_bins, labels=ks2_labels, right=False)
             math_counts = math_binned.value_counts().reindex(ks2_labels, fill_value=0)
             
@@ -156,7 +172,6 @@ def analytics(df_y7, df_y10):
         if read_col:
             st.markdown("**Reading Distribution**")
             read_nums = pd.to_numeric(df[read_col], errors='coerce').dropna()
-            
             read_binned = pd.cut(read_nums, bins=ks2_bins, labels=ks2_labels, right=False)
             read_counts = read_binned.value_counts().reindex(ks2_labels, fill_value=0)
             
@@ -172,9 +187,7 @@ def analytics(df_y7, df_y10):
 
     st.write("---")
     
-    # --- RAW DATA TABLE WITH COHORT COLUMN FILTERS ---
     st.subheader("Raw Data")
-    
     if analytics_cohort == "Year 7":
         desired_cols = [
             "Full Name", "Form Group", "Maths Set", "DoB", "Gender", 
@@ -194,11 +207,8 @@ def analytics(df_y7, df_y10):
             "Attendance %", "Suspension days"
         ]
         
-    # Safety check: Only display columns that actually exist in the spreadsheet
     final_cols = [col for col in desired_cols if col in df.columns]
-    
     st.dataframe(df[final_cols], use_container_width=True)
-
 
 # ---------------------------
 # ROUTING & FILTERS
@@ -225,10 +235,19 @@ elif page == "Year 7":
     if selected_math:
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
+    st.sidebar.divider()
     report_option = st.sidebar.radio(
         "Select Report Detail",
         ["Base Passport (No Details)", "Short Report (Portrait & Home Life)", "Detailed Report (All Subjects)"]
     )
+    
+    # --- PRINT MODE TOGGLE ---
+    st.sidebar.divider()
+    print_mode = st.sidebar.toggle("🖨️ Enable Print View", value=False)
+    
+    if print_mode:
+        inject_print_css()
+        st.success("🖨️ **Print View Ready!** Press `Ctrl + P` (Windows) or `Cmd + P` (Mac) and select **Save as PDF** to generate your document.")
 
     mode = "None"
     if report_option == "Short Report (Portrait & Home Life)":
@@ -244,7 +263,8 @@ elif page == "Year 7":
     st.subheader("📄 Detailed Passports")
     
     for _, row in filtered_df.iterrows():
-        render_student_card(row, "Year 7", show_projected=True, report_type=mode)
+        # Pass the print_mode setting to the cards
+        render_student_card(row, "Year 7", show_projected=True, report_type=mode, is_print_mode=print_mode)
 
 # ------------------ YEAR 10 ------------------
 elif page == "Year 10":
@@ -280,10 +300,19 @@ elif page == "Year 10":
             (filtered_df[selected_subject].astype(str).str.strip() != "")
         ]
 
+    st.sidebar.divider()
     report_option = st.sidebar.radio(
         "Select Report Detail",
         ["Base Passport (No Details)", "Short Report (KS3 & Home Life)", "Detailed Report (All Subjects)"]
     )
+
+    # --- PRINT MODE TOGGLE ---
+    st.sidebar.divider()
+    print_mode = st.sidebar.toggle("🖨️ Enable Print View", value=False)
+    
+    if print_mode:
+        inject_print_css()
+        st.success("🖨️ **Print View Ready!** Press `Ctrl + P` (Windows) or `Cmd + P` (Mac) and select **Save as PDF** to generate your document.")
 
     mode = "None"
     if report_option == "Short Report (KS3 & Home Life)":
@@ -299,7 +328,8 @@ elif page == "Year 10":
     st.subheader("📄 Detailed Passports")
     
     for _, row in filtered_df.iterrows():
-        render_student_card(row, "Year 10", show_projected=True, report_type=mode)
+        # Pass the print_mode setting to the cards
+        render_student_card(row, "Year 10", show_projected=True, report_type=mode, is_print_mode=print_mode)
 
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
