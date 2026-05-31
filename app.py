@@ -120,29 +120,54 @@ def analytics(df_y7, df_y10):
 
     st.write("---")
 
-    # --- GRAPHS ---
+    # --- GRAPHS WITH NUMERICAL BATCHING ---
     st.subheader("📈 KS2 / SATs Performance")
     g1, g2 = st.columns(2)
     
-    # Smart column matchers
     read_col = next((c for c in df.columns if c.strip().lower() in ["ks2 read", "ks2 reading", "sats reading", "reading score"]), None)
     math_col = next((c for c in df.columns if c.strip().lower() in ["ks2 maths", "ks2 math", "sats maths", "maths score"]), None)
     
     with g1:
         if math_col:
-            st.markdown("**Maths Distribution**")
-            math_data = df[math_col].dropna().astype(str).str.replace(".0", "", regex=False)
-            math_data = math_data[~math_data.str.upper().isin(ignore_list)]
-            st.bar_chart(math_data.value_counts())
+            st.markdown("**Maths Distribution (Batches of 5)**")
+            # Force values to numeric format to eliminate text/empty anomalies
+            math_nums = pd.to_numeric(df[math_col], errors='coerce').dropna()
+            
+            if not math_nums.empty:
+                # Group numbers into dynamic steps of 5
+                min_score = int((math_nums.min() // 5) * 5)
+                max_score = int((math_nums.max() // 5) * 5) + 5
+                bins = list(range(min_score, max_score + 5, 5))
+                labels = [f"{bins[i]}-{bins[i]+4}" for i in range(len(bins)-1)]
+                
+                # Cut data and sort by range index order
+                math_binned = pd.cut(math_nums, bins=bins, labels=labels, right=False)
+                math_counts = math_binned.value_counts().sort_index()
+                st.bar_chart(math_counts)
+            else:
+                st.caption("*(No numeric Maths data available)*")
         else:
             st.caption("*(No Maths data available)*")
             
     with g2:
         if read_col:
-            st.markdown("**Reading Distribution**")
-            read_data = df[read_col].dropna().astype(str).str.replace(".0", "", regex=False)
-            read_data = read_data[~read_data.str.upper().isin(ignore_list)]
-            st.bar_chart(read_data.value_counts())
+            st.markdown("**Reading Distribution (Batches of 5)**")
+            # Force values to numeric format to eliminate text/empty anomalies
+            read_nums = pd.to_numeric(df[read_col], errors='coerce').dropna()
+            
+            if not read_nums.empty:
+                # Group numbers into dynamic steps of 5
+                min_score = int((read_nums.min() // 5) * 5)
+                max_score = int((read_nums.max() // 5) * 5) + 5
+                bins = list(range(min_score, max_score + 5, 5))
+                labels = [f"{bins[i]}-{bins[i]+4}" for i in range(len(bins)-1)]
+                
+                # Cut data and sort by range index order
+                read_binned = pd.cut(read_nums, bins=bins, labels=labels, right=False)
+                read_counts = read_binned.value_counts().sort_index()
+                st.bar_chart(read_counts)
+            else:
+                st.caption("*(No numeric Reading data available)*")
         else:
             st.caption("*(No Reading data available)*")
 
@@ -255,4 +280,3 @@ elif page == "Year 10":
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
     analytics(df_y7, df_y10)
-    
