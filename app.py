@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from modules.data_loader import load_data
 from modules.report_renderers import render_student_card, render_photo_grid
 
@@ -123,7 +124,7 @@ def analytics(df_y7, df_y10):
 
     st.write("---")
 
-    # --- GRAPHS WITH FIXED, CATEGORICAL AXES ---
+    # --- GRAPHS WITH FIXED, CATEGORICAL AXES (ALTAIR) ---
     st.subheader("📈 KS2 / SATs Performance")
     g1, g2 = st.columns(2)
     
@@ -142,11 +143,14 @@ def analytics(df_y7, df_y10):
             math_binned = pd.cut(math_nums, bins=ks2_bins, labels=ks2_labels, right=False)
             math_counts = math_binned.value_counts().reindex(ks2_labels, fill_value=0)
             
-            # Pack into a DataFrame and lock the order using Categorical so Streamlit can't sort it alphabetically
             df_math = pd.DataFrame({"Score Range": ks2_labels, "Students": math_counts.values})
-            df_math["Score Range"] = pd.Categorical(df_math["Score Range"], categories=ks2_labels, ordered=True)
             
-            st.bar_chart(df_math, x="Score Range", y="Students")
+            # Altair Chart with hardcoded Y-Axis max of 15
+            chart_math = alt.Chart(df_math).mark_bar().encode(
+                x=alt.X('Score Range', sort=ks2_labels, title="Score Range"),
+                y=alt.Y('Students', scale=alt.Scale(domain=[0, 15]), title="Students")
+            )
+            st.altair_chart(chart_math, use_container_width=True)
         else:
             st.caption("*(No Maths data available)*")
             
@@ -158,11 +162,14 @@ def analytics(df_y7, df_y10):
             read_binned = pd.cut(read_nums, bins=ks2_bins, labels=ks2_labels, right=False)
             read_counts = read_binned.value_counts().reindex(ks2_labels, fill_value=0)
             
-            # Pack into a DataFrame and lock the order using Categorical
             df_read = pd.DataFrame({"Score Range": ks2_labels, "Students": read_counts.values})
-            df_read["Score Range"] = pd.Categorical(df_read["Score Range"], categories=ks2_labels, ordered=True)
             
-            st.bar_chart(df_read, x="Score Range", y="Students")
+            # Altair Chart with hardcoded Y-Axis max of 15
+            chart_read = alt.Chart(df_read).mark_bar().encode(
+                x=alt.X('Score Range', sort=ks2_labels, title="Score Range"),
+                y=alt.Y('Students', scale=alt.Scale(domain=[0, 15]), title="Students")
+            )
+            st.altair_chart(chart_read, use_container_width=True)
         else:
             st.caption("*(No Reading data available)*")
 
@@ -274,4 +281,4 @@ elif page == "Year 10":
 
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
-    analytics(df_y7, df_y10)#
+    analytics(df_y7, df_y10)
