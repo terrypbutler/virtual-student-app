@@ -58,7 +58,8 @@ def student_search(df_y7, df_y10):
             st.warning("No matches found.")
 
         for _, row in results.iterrows():
-            render_student_card(row, search_cohort, show_subjects=True, show_projected=True)
+            # Force Detailed report on search so teachers see everything
+            render_student_card(row, search_cohort, show_projected=True, report_type="Detailed")
 
 # ---------------------------
 # ANALYTICS
@@ -122,11 +123,11 @@ elif page == "Year 7":
         ["Base Passport (No Details)", "Short Report (Portrait & Home Life)", "Detailed Report (All Subjects)"]
     )
 
-    y7_mode = "None"
+    mode = "None"
     if report_option == "Short Report (Portrait & Home Life)":
-        y7_mode = "Short"
+        mode = "Short"
     elif report_option == "Detailed Report (All Subjects)":
-        y7_mode = "Detailed"
+        mode = "Detailed"
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     
@@ -136,7 +137,7 @@ elif page == "Year 7":
     st.subheader("📄 Detailed Passports")
     
     for _, row in filtered_df.iterrows():
-        render_student_card(row, "Year 7", show_projected=True, y7_report_type=y7_mode)
+        render_student_card(row, "Year 7", show_projected=True, report_type=mode)
 
 # ------------------ YEAR 10 ------------------
 elif page == "Year 10":
@@ -172,7 +173,17 @@ elif page == "Year 10":
             (filtered_df[selected_subject].astype(str).str.strip() != "")
         ]
 
-    is_full_report = st.sidebar.checkbox("Show Full Report (with subjects & projected)", value=False)
+    # New 3-tier selector for Year 10
+    report_option = st.sidebar.radio(
+        "Select Report Detail",
+        ["Base Passport (No Details)", "Short Report (KS3 & Home Life)", "Detailed Report (All Subjects)"]
+    )
+
+    mode = "None"
+    if report_option == "Short Report (KS3 & Home Life)":
+        mode = "Short"
+    elif report_option == "Detailed Report (All Subjects)":
+        mode = "Detailed"
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     
@@ -182,8 +193,9 @@ elif page == "Year 10":
     st.subheader("📄 Detailed Passports")
     
     for _, row in filtered_df.iterrows():
-        render_student_card(row, "Year 10", show_subjects=is_full_report, show_projected=is_full_report)
+        render_student_card(row, "Year 10", show_projected=True, report_type=mode)
 
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
     analytics(df_y7, df_y10)
+    
