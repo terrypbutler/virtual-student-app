@@ -58,7 +58,6 @@ def student_search(df_y7, df_y10):
             st.warning("No matches found.")
 
         for _, row in results.iterrows():
-            # Force Detailed report on search so teachers see everything
             render_student_card(row, search_cohort, show_projected=True, report_type="Detailed")
 
 # ---------------------------
@@ -68,30 +67,89 @@ def analytics(df_y7, df_y10):
     st.title("📊 Cohort Analytics Dashboard")
 
     analytics_cohort = st.radio("Select Cohort to Analyze:", ["Year 7", "Year 10"], horizontal=True)
-    df = df_y7 if analytics_cohort == "Year 7" else df_y10
+    df_base = df_y7 if analytics_cohort == "Year 7" else df_y10
 
-    st.subheader("Overview")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Students", len(df))
+    st.sidebar.subheader("🔎 Analytics Filters")
 
-    if "SEN Status" in df.columns:
-        col2.metric("SEN", (df["SEN Status"].fillna("") != "").sum())
+    # --- FILTERS ---
+    form_groups = safe_unique(df_base, "Form Group")
+    maths_sets = safe_unique(df_base, "Maths Set")
 
-    if "EAL" in df.columns:
-        col3.metric("EAL", (df["EAL"].fillna("") != "").sum())
+    selected_form = st.sidebar.multiselect("Form Tutor Group", form_groups, key="ana_form")
+    selected_math = st.sidebar.multiselect("Maths Set", maths_sets, key="ana_math")
+
+    subject_cols = [
+        "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design",
+        "Drama","Geography","History","Hospitality","Music","Photography",
+        "Spanish","Sport"
+    ]
+    available_subjects = [c for c in subject_cols if c in df_base.columns]
+    selected_subject = st.sidebar.selectbox("Option Class (optional)", ["All Subjects"] + available_subjects, key="ana_sub")
+
+    # --- APPLY FILTERS ---
+    df = df_base.copy()
+    if selected_form:
+        df = df[df["Form Group"].astype(str).isin(selected_form)]
+    if selected_math:
+        df = df[df["Maths Set"].astype(str).isin(selected_math)]
+    if selected_subject != "All Subjects":
+        df = df[
+            df[selected_subject].notna() &
+            (df[selected_subject].astype(str).str.strip() != "")
+        ]
+
+    # --- CALCULATE METRICS ---
+    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN"]
+    
+    def count_active(col_names):
+        col = next((c for c in df.columns if c.strip().lower() in [n.lower() for n in col_names]), None)
+        if col:
+            return df[col].astype(str).str.upper().apply(lambda x: x.strip() not in ignore_list).sum()
+        return 0
+
+    sen_count = count_active(["SEN Status", "SEND Status"])
+    eal_count = count_active(["EAL", "EAL Status"])
+    pp_count = count_active(["Premium", "Disadvantaged", "Pupil Premium", "PP"])
+
+    st.subheader(f"Overview: {len(df)} Students")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Students", len(df))
+    m2.metric("SEN Support", sen_count)
+    m3.metric("EAL", eal_count)
+    m4.metric("Pupil Premium", pp_count)
 
     st.write("---")
 
-    if "SEN Status" in df.columns:
-        st.subheader("SEN Distribution")
-        st.bar_chart(df["SEN Status"].value_counts())
+    # --- GRAPHS ---
+    st.subheader("📈 KS2 / SATs Performance")
+    g1, g2 = st.columns(2)
+    
+    # Smart column matchers
+    read_col = next((c for c in df.columns if c.strip().lower() in ["ks2 read", "ks2 reading", "sats reading", "reading score"]), None)
+    math_col = next((c for c in df.columns if c.strip().lower() in ["ks2 maths", "ks2 math", "sats maths", "maths score"]), None)
+    
+    with g1:
+        if math_col:
+            st.markdown("**Maths Distribution**")
+            math_data = df[math_col].dropna().astype(str).str.replace(".0", "", regex=False)
+            math_data = math_data[~math_data.str.upper().isin(ignore_list)]
+            st.bar_chart(math_data.value_counts())
+        else:
+            st.caption("*(No Maths data available)*")
+            
+    with g2:
+        if read_col:
+            st.markdown("**Reading Distribution**")
+            read_data = df[read_col].dropna().astype(str).str.replace(".0", "", regex=False)
+            read_data = read_data[~read_data.str.upper().isin(ignore_list)]
+            st.bar_chart(read_data.value_counts())
+        else:
+            st.caption("*(No Reading data available)*")
 
-    if "EAL" in df.columns:
-        st.subheader("EAL Distribution")
-        st.bar_chart(df["EAL"].value_counts())
-
+    st.write("---")
     st.subheader("Raw Data")
     st.dataframe(df, use_container_width=True)
+
 
 # ---------------------------
 # ROUTING & FILTERS
@@ -173,7 +231,6 @@ elif page == "Year 10":
             (filtered_df[selected_subject].astype(str).str.strip() != "")
         ]
 
-    # New 3-tier selector for Year 10
     report_option = st.sidebar.radio(
         "Select Report Detail",
         ["Base Passport (No Details)", "Short Report (KS3 & Home Life)", "Detailed Report (All Subjects)"]
