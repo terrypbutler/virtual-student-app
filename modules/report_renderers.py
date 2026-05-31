@@ -5,21 +5,19 @@ from modules.helpers import get_field
 
 def get_flexible_text(row, possible_names):
     """Helper to find columns even if they have hidden spaces or weird capitalization."""
-    # Create a dictionary of all column names, but strictly lowercased and stripped of spaces
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
     
     for name in possible_names:
         clean_name = name.lower().strip()
         if clean_name in row_keys:
             val = str(row[row_keys[clean_name]]).strip()
-            # Make sure it isn't an empty or "NaN" cell
             if val and val.lower() not in ["nan", "none", "n/a", ""]:
                 return val
     return None
 
 def render_student_card(row, cohort, show_subjects=False, show_projected=True, y7_report_type="None"):
     """
-    Master rendering function. Adapts to Y7/Y9 and specific report requirements.
+    Master rendering function. Adapts to Y7/Y10 and specific report requirements.
     """
     name = row.get("Full Name", "Unknown")
     
@@ -43,7 +41,6 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
             st.divider()
             st.markdown(f"### 📑 {y7_report_type} Report")
             
-            # Bulletproof check for Portrait
             portrait = get_flexible_text(row, ["Transition Portrait", "Transition portrait", "Portrait"])
             if portrait:
                 st.markdown("**Transition Portrait:**")
@@ -51,7 +48,6 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
             else:
                 st.caption("*(No Transition Portrait data found in spreadsheet)*")
                 
-            # Bulletproof check for Home Life
             home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Home life & interests", "Interests"])
             if home_life:
                 st.markdown("**Home Life & Interests:**")
@@ -59,7 +55,6 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
             else:
                 st.caption("*(No Home Life data found in spreadsheet)*")
                 
-            # Only Detailed shows the subjects table
             if y7_report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
                 y7_subjects = ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"]
@@ -67,7 +62,6 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 available_y7 = {}
                 row_keys_lower = {str(k).strip().lower(): k for k in row.keys()}
                 
-                # Bulletproof check for subjects
                 for sub in y7_subjects:
                     sub_clean = sub.lower()
                     if sub_clean in row_keys_lower:
@@ -81,8 +75,8 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 else:
                     st.caption("*(No subject data found for this student)*")
 
-        # --- 5. YEAR 9 SUBJECT REPORTS ---
-        elif show_subjects and cohort == "Year 9":
+        # --- 5. YEAR 10 SUBJECT REPORTS ---
+        elif show_subjects and cohort == "Year 10":
             st.subheader("Subject Reports")
             subject_cols = [
                 "Eng Lang","Eng Lit","Maths","Science","Art","Computing",
@@ -110,7 +104,6 @@ def render_photo_grid(df, cohort, num_cols=5):
 
     ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN"]
 
-    # --- 1. CALCULATE COHORT STATS ---
     sen_count = 0
     eal_count = 0
     pp_count = 0
@@ -123,7 +116,6 @@ def render_photo_grid(df, cohort, num_cols=5):
         if str(get_field(row, "pp")).strip().upper() not in ignore_list:
             pp_count += 1
 
-    # --- 2. RENDER METRICS DASHBOARD ---
     st.markdown("### 📊 Selection Overview")
     
     m1, m2, m3, m4 = st.columns(4)
@@ -134,7 +126,6 @@ def render_photo_grid(df, cohort, num_cols=5):
 
     st.write("---") 
 
-    # --- 3. RENDER PHOTO GRID ---
     for i in range(0, len(df), num_cols):
         cols = st.columns(num_cols)
         row_students = df.iloc[i : i + num_cols]
