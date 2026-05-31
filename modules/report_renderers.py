@@ -1,47 +1,38 @@
 import streamlit as st
 import pandas as pd
+import os
+import base64
+from io import BytesIO
+from PIL import Image, ImageOps
 from modules.photo_utils import display_student_photo
 
 def get_flexible_text(row, possible_names):
-    """Helper to find columns and strip out N/A values completely."""
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
-    
     for name in possible_names:
         clean_name = name.lower().strip()
         if clean_name in row_keys:
             val = str(row[row_keys[clean_name]]).strip()
             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
-                if val.endswith(".0"):
-                    val = val[:-2]
+                if val.endswith(".0"): val = val[:-2]
                 return val
     return None
 
-def render_student_card(row, cohort, show_projected=True, report_type="None", is_print_mode=False):
-    """
-    Master rendering function. Adapts to Y7/Y10 and specific 3-tier report requirements.
-    Added is_print_mode to force expanders open for PDF printing.
-    """
+def render_student_card(row, cohort, show_projected=True, report_type="None"):
     name = row.get("Full Name", "Unknown")
     
-    # If print mode is on, force the expander open!
-    with st.expander(f"👤 {name}", expanded=is_print_mode):
-        
-        # --- 1. HEADER & SUMMARY DASHBOARD ---
+    with st.expander(f"👤 {name}"):
         left, right = st.columns([3, 1])
         
         with left:
             st.markdown(f"### {cohort} Profile")
-            
             def get_val(keys):
                 for k in keys:
                     for row_key in row.keys():
                         if str(row_key).strip().lower() == str(k).strip().lower():
                             val = str(row[row_key]).strip()
                             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL"]:
-                                if val.endswith(".0"):
-                                    val = val[:-2]
-                                if "attendance" in str(k).lower() and "%" not in val:
-                                    val = f"{val}%"
+                                if val.endswith(".0"): val = val[:-2]
+                                if "attendance" in str(k).lower() and "%" not in val: val = f"{val}%"
                                 return val
                 return ""
 
@@ -63,30 +54,20 @@ def render_student_card(row, cohort, show_projected=True, report_type="None", is
             items = list(info.items())
             for i, (label, keys) in enumerate(items):
                 value = get_val(keys)
-                
-                html_card = f"""
-                <div style='margin-bottom: 12px; line-height: 1.3;'>
-                    <span style='font-size: 0.85em; opacity: 0.7;'>{label}</span><br>
-                    <span style='font-size: 1.1em; font-weight: 600; display: inline-block; word-wrap: break-word;'>{value}</span>
-                </div>
-                """
+                html_card = f"<div style='margin-bottom: 12px; line-height: 1.3;'><span style='font-size: 0.85em; opacity: 0.7;'>{label}</span><br><span style='font-size: 1.1em; font-weight: 600; display: inline-block; word-wrap: break-word;'>{value}</span></div>"
                 cols[i % 2].markdown(html_card, unsafe_allow_html=True)
                 
         with right:
             display_student_photo(name, cohort)
             
         st.divider()
-        
         if show_projected:
             proj = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
-            if proj:
-                st.info(f"**Overall Projected Grade:** {proj}")
+            if proj: st.info(f"**Overall Projected Grade:** {proj}")
                 
-        # --- 4. YEAR 7 CUSTOM REPORTS ---
         if cohort == "Year 7" and report_type != "None":
             st.divider()
             st.markdown(f"### 📑 {report_type} Report")
-            
             portrait = get_flexible_text(row, ["Transition Portrait", "Transition portrait", "Portrait"])
             if portrait:
                 st.markdown("**Transition Portrait:**")
@@ -104,21 +85,12 @@ def render_student_card(row, cohort, show_projected=True, report_type="None", is
             if report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
                 y7_subjects = ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"]
-                
-                available_y7 = {}
-                for sub in y7_subjects:
-                    val = get_flexible_text(row, [sub])
-                    if val:
-                        available_y7[sub] = val
-                
-                if available_y7:
-                    st.table(available_y7)
+                available_y7 = {sub: get_flexible_text(row, [sub]) for sub in y7_subjects if get_flexible_text(row, [sub])}
+                if available_y7: st.table(available_y7)
 
-        # --- 5. YEAR 10 CUSTOM REPORTS ---
         elif cohort == "Year 10" and report_type != "None":
             st.divider()
             st.markdown(f"### 📑 {report_type} Report")
-
             ks3_report = get_flexible_text(row, ["Key Stage 3 Report", "KS3 Report", "Key Stage 3"])
             if ks3_report:
                 st.markdown("**Key Stage 3 Report:**")
@@ -135,117 +107,189 @@ def render_student_card(row, cohort, show_projected=True, report_type="None", is
 
             if report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
-                subject_cols = [
-                    "Eng Lang","Eng Lit","Maths","Science","Art","Computing",
-                    "Design","Drama","Geography","History","Hospitality","Music",
-                    "Photography","Spanish","Sport"
-                ]
-                
+                subject_cols = ["Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama","Geography","History","Hospitality","Music","Photography","Spanish","Sport"]
                 table_data = []
                 global_pred = get_flexible_text(row, ["Projected Grade", "Predicted Grade"]) or ""
                 
                 for sub in subject_cols:
                     grade = get_flexible_text(row, [sub])
-                    
                     if grade: 
                         if sub.lower() == "science":
                             sci1 = get_flexible_text(row, ["Sci 1 Predicted Grade", "Sci 1 Predicted"])
                             sci2 = get_flexible_text(row, ["Sci 2 Predicted Grade", "Sci 2 Predicted"])
-                            
-                            if sci1 and sci2:
-                                sub_pred = f"{sci1}-{sci2}"
-                            elif sci1:
-                                sub_pred = sci1
-                            elif sci2:
-                                sub_pred = sci2
-                            else:
-                                sub_pred = get_flexible_text(row, ["Science Predicted Grade", "Science Predicted"])
+                            if sci1 and sci2: sub_pred = f"{sci1}-{sci2}"
+                            elif sci1: sub_pred = sci1
+                            elif sci2: sub_pred = sci2
+                            else: sub_pred = get_flexible_text(row, ["Science Predicted Grade", "Science Predicted"])
                         else:
                             sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade", f"{sub} Predicted", f"Predicted {sub}"])
                         
-                        final_pred = sub_pred if sub_pred else global_pred
-                        
-                        table_data.append({
-                            "Subject": sub,
-                            "Current Grade": grade,
-                            "Predicted Grade": final_pred
-                        })
+                        table_data.append({"Subject": sub, "Current Grade": grade, "Predicted Grade": sub_pred if sub_pred else global_pred})
                 
                 if table_data:
-                    df_subjects = pd.DataFrame(table_data)
-                    st.table(df_subjects.set_index("Subject"))
+                    st.table(pd.DataFrame(table_data).set_index("Subject"))
 
 def render_photo_grid(df, cohort, num_cols=5):
-    """
-    Renders a strict grid of student photos with key demographic details.
-    """
     if df.empty:
         st.warning("No students found for this selection.")
         return
 
     ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
-
-    sen_count = 0
-    eal_count = 0
-    pp_count = 0
+    sen_count, eal_count, pp_count = 0, 0, 0
 
     for _, row in df.iterrows():
-        sen_val = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
-        eal_val = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
-        pp_val = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP", "Premium"]) or ""
-        
-        if sen_val.upper() not in ignore_list:
-            sen_count += 1
-        if eal_val.upper() not in ignore_list:
-            eal_count += 1
-        if pp_val.upper() not in ignore_list:
-            pp_count += 1
+        if (get_flexible_text(row, ["SEN Status", "SEND Status"]) or "").upper() not in ignore_list: sen_count += 1
+        if (get_flexible_text(row, ["EAL", "EAL Status"]) or "").upper() not in ignore_list: eal_count += 1
+        if (get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP"]) or "").upper() not in ignore_list: pp_count += 1
 
     st.markdown("### 📊 Selection Overview")
-    
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Students", len(df))
     m2.metric("SEN Support", sen_count)
     m3.metric("EAL", eal_count)
     m4.metric("Pupil Premium", pp_count)
-
     st.write("---") 
 
     for i in range(0, len(df), num_cols):
         cols = st.columns(num_cols)
         row_students = df.iloc[i : i + num_cols]
-        
         for col, (_, row) in zip(cols, row_students.iterrows()):
             with col:
                 name = row.get("Full Name", "Unknown")
-                
                 sen_status = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
                 eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
-                pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP", "Premium"]) or ""
-                
-                sen_active = sen_status.upper() not in ignore_list
-                pp_active = pp_status.upper() not in ignore_list
-                eal_active = eal_status.upper() not in ignore_list
+                pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP"]) or ""
                 
                 display_student_photo(name, cohort)
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
                 
                 active_labels = []
-                if sen_active:
-                    # Simply displays the status without attaching the detail string!
-                    active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}</span>")
-                if pp_active:
-                    active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
-                if eal_active:
-                    active_labels.append(f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>")
+                if sen_status.upper() not in ignore_list: active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}</span>")
+                if pp_status.upper() not in ignore_list: active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
+                if eal_status.upper() not in ignore_list: active_labels.append(f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>")
                 
                 if active_labels:
-                    labels_combined = "<br>".join(active_labels)
-                    details_html = f"""
-                    <div style='text-align: center; font-size: 0.8em; line-height: 1.4; padding-bottom: 10px;'>
-                        {labels_combined}
-                    </div>
-                    """
-                    st.markdown(details_html, unsafe_allow_html=True)
-        
+                    st.markdown(f"<div style='text-align: center; font-size: 0.8em; line-height: 1.4; padding-bottom: 10px;'>{'<br>'.join(active_labels)}</div>", unsafe_allow_html=True)
         st.write("---")
+
+# -------------------------------------------------------------------
+# THE NEW PROFESSIONAL HTML EXPORT ENGINE
+# -------------------------------------------------------------------
+def get_image_base64(name, cohort):
+    """Safely converts local images to embedded HTML format so they print perfectly."""
+    photo_folder = "photos"
+    if not os.path.exists(photo_folder): return ""
+    
+    safe_name = " ".join(str(name).strip().lower().split()).replace(".", "")
+    files = {f.lower(): f for f in os.listdir(photo_folder)}
+    
+    if f"{safe_name}.png" in files:
+        try:
+            img = Image.open(os.path.join(photo_folder, files[f"{safe_name}.png"]))
+            w, h = img.size
+            top, bottom = int(h * 0.08), h - int(h * 0.13)
+            crop = (0, top, w // 2, bottom) if cohort == "Year 7" else (w // 2, top, w, bottom)
+            img = ImageOps.fit(img.crop(crop), (140, 185))
+            
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
+            return f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode()}"
+        except: return ""
+    return ""
+
+def generate_printable_html(df, cohort, report_type):
+    """Builds a beautiful, standalone HTML document formatted for A4 printing."""
+    html = [
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Student Reports</title><style>",
+        "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222; line-height: 1.4; margin: 20px; }",
+        "@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .page-break { page-break-after: always; } }",
+        ".grid-container { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 30px; }",
+        ".grid-item { width: 145px; text-align: center; border: 1px solid #ddd; padding: 10px; border-radius: 8px; page-break-inside: avoid; }",
+        ".photo { width: 140px; height: 185px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }",
+        ".photo-placeholder { width: 140px; height: 185px; background: #eee; border-radius: 4px; display: inline-block; line-height: 185px; color: #999; border: 1px solid #ccc; }",
+        ".name { font-weight: bold; margin: 8px 0 4px 0; font-size: 14px; }",
+        ".tag { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-bottom: 2px; font-weight: bold; }",
+        ".tag-sen { background: #fee2e2; color: #b91c1c; } .tag-pp { background: #e0f2fe; color: #0369a1; } .tag-eal { background: #dcfce7; color: #15803d; }",
+        ".card { border: 2px solid #2C3E50; border-radius: 8px; padding: 20px; margin-bottom: 30px; page-break-inside: avoid; }",
+        ".header-row { display: flex; justify-content: space-between; margin-bottom: 15px; }",
+        ".demo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 75%; }",
+        ".metric { background: #f8f9fa; padding: 8px; border-radius: 4px; border: 1px solid #eee; }",
+        ".metric-label { font-size: 11px; color: #666; text-transform: uppercase; } .metric-value { font-size: 14px; font-weight: bold; }",
+        ".section-title { border-bottom: 2px solid #3498DB; padding-bottom: 4px; margin: 15px 0 10px 0; font-size: 16px; color: #2C3E50; font-weight: bold; }",
+        "table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }",
+        "th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; } th { background-color: #f2f2f2; }",
+        "</style></head><body>"
+    ]
+    
+    ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
+    
+    # 1. GENERATE THE PHOTO GRID
+    html.append(f"<h2>{cohort} - Photo Overview</h2><div class='grid-container'>")
+    for _, row in df.iterrows():
+        name = row.get("Full Name", "Unknown")
+        img_b64 = get_image_base64(name, cohort)
+        sen_status = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
+        pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "PP"]) or ""
+        eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
+        
+        img_html = f"<img src='{img_b64}' class='photo'>" if img_b64 else "<div class='photo-placeholder'>No Photo</div>"
+        html.append(f"<div class='grid-item'>{img_html}<div class='name'>{name}</div>")
+        if sen_status.upper() not in ignore_list: html.append(f"<div class='tag tag-sen'>{sen_status}</div>")
+        if pp_status.upper() not in ignore_list: html.append(f"<div class='tag tag-pp'>PP</div>")
+        if eal_status.upper() not in ignore_list: html.append(f"<div class='tag tag-eal'>EAL: {eal_status}</div>")
+        html.append("</div>")
+    html.append("</div><div class='page-break'></div>")
+    
+    # 2. GENERATE THE PASSPORTS
+    html.append(f"<h2>{cohort} - Detailed Passports</h2>")
+    for _, row in df.iterrows():
+        name = row.get("Full Name", "Unknown")
+        img_b64 = get_image_base64(name, cohort)
+        
+        html.append(f"<div class='card'><h3 style='margin-top:0;'>{name}</h3><div class='header-row'><div class='demo-grid'>")
+        
+        info = {
+            "Form Group": ["Form Tutor", "Tutor", "Form Group"], "Attendance": ["Attendance %", "Attendance"],
+            "SEN Status": ["SEN Status", "SEND Status"], "SEN Detail": ["SEN detail", "SEND detail"],
+            "Disadvantaged": ["Disadvantaged (PP)", "PP"], "KS2 Reading": ["KS2 Read", "KS2 Reading"], 
+            "KS2 Maths": ["KS2 Maths", "KS2 Math"]
+        }
+        
+        for label, keys in info.items():
+            val = get_flexible_text(row, keys) or ""
+            if "attendance" in label.lower() and val and "%" not in val: val += "%"
+            html.append(f"<div class='metric'><div class='metric-label'>{label}</div><div class='metric-value'>{val}</div></div>")
+            
+        html.append(f"</div>") # End demo-grid
+        html.append(f"<img src='{img_b64}' class='photo' style='width:120px;height:160px;'>" if img_b64 else "<div class='photo-placeholder' style='width:120px;height:160px;line-height:160px;'>No Photo</div>")
+        html.append("</div>") # End header-row
+        
+        proj = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
+        if proj: html.append(f"<div style='background:#e8f4f8; padding:8px; border-radius:4px; border:1px solid #bce8f1;'><strong>Overall Projected Grade:</strong> {proj}</div>")
+            
+        if cohort == "Year 7" and report_type != "None":
+            port = get_flexible_text(row, ["Transition Portrait", "Portrait"])
+            if port: html.append(f"<div class='section-title'>Transition Portrait</div><p>{port}</p>")
+            home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
+            if home: html.append(f"<div class='section-title'>Home Life & Interests</div><p>{home}</p>")
+            if report_type == "Detailed":
+                rows = [f"<tr><td style='font-weight:bold; width:30%;'>{s}</td><td>{get_flexible_text(row, [s])}</td></tr>" for s in ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"] if get_flexible_text(row, [s])]
+                if rows: html.append(f"<div class='section-title'>Subject Overviews</div><table>{''.join(rows)}</table>")
+
+        elif cohort == "Year 10" and report_type != "None":
+            ks3 = get_flexible_text(row, ["Key Stage 3 Report", "KS3 Report"])
+            if ks3: html.append(f"<div class='section-title'>Key Stage 3 Report</div><p>{ks3}</p>")
+            home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
+            if home: html.append(f"<div class='section-title'>Home Life & Interests</div><p>{home}</p>")
+            if report_type == "Detailed":
+                rows = []
+                for sub in ["Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama","Geography","History","Hospitality","Music","Photography","Spanish","Sport"]:
+                    grade = get_flexible_text(row, [sub])
+                    if grade:
+                        sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade"]) if sub.lower() != "science" else (get_flexible_text(row, ["Sci 1 Predicted Grade"]) or "") + ("-" + get_flexible_text(row, ["Sci 2 Predicted Grade"]) if get_flexible_text(row, ["Sci 2 Predicted Grade"]) else "")
+                        rows.append(f"<tr><td style='font-weight:bold;'>{sub}</td><td>{grade}</td><td>{sub_pred or proj or ''}</td></tr>")
+                if rows: html.append(f"<div class='section-title'>Subject Reports</div><table><tr><th>Subject</th><th>Current Grade</th><th>Predicted Grade</th></tr>{''.join(rows)}</table>")
+        html.append("</div>") # End card
+        
+    html.append("</body></html>")
+    return "\n".join(html)
