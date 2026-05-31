@@ -99,7 +99,6 @@ def analytics(df_y7, df_y10):
         ]
 
     # --- CALCULATE METRICS ---
-    # Added 0 and 0.0 to catch numerical 'False' flags
     ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
     
     def count_active(col_names):
@@ -111,9 +110,9 @@ def analytics(df_y7, df_y10):
     sen_count = count_active(["SEN Status", "SEND Status"])
     eal_count = count_active(["EAL", "EAL Status"])
     
-    # Expanded the net to catch any possible name for Pupil Premium
+    # Added "Disadvantaged (PP)" exactly as it appears
     pp_count = count_active([
-        "Premium", "Disadvantaged", "Pupil Premium", "PP", 
+        "Disadvantaged (PP)", "Premium", "Disadvantaged", "Pupil Premium", "PP", 
         "FSM", "Ever 6", "FSM6", "Pupil Premium Indicator"
     ])
 
