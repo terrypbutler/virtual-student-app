@@ -40,37 +40,50 @@ page = st.sidebar.radio(
 )
 
 # ---------------------------
-# CSS PRINT INJECTION (UPDATED)
+# CSS PRINT INJECTION (NUCLEAR OPTION)
 # ---------------------------
 def inject_print_css():
     st.markdown("""
         <style>
         @media print {
-            /* Hide the sidebar and top navigation bars */
-            section[data-testid="stSidebar"] { display: none !important; }
-            header[data-testid="stHeader"] { display: none !important; }
-            footer { display: none !important; }
+            /* 1. Hide all the Streamlit UI elements */
+            header, [data-testid="stHeader"], [data-testid="stSidebar"], .stApp > header {
+                display: none !important;
+            }
             
-            /* FORCE THE BROWSER TO UNROLL THE SCROLLBOX FOR FULL PAGE PRINTING */
-            html, body, .stApp, section.main, .block-container {
-                height: auto !important;
-                min-height: auto !important;
+            /* 2. Break every single scroll-lock container */
+            html, body, .stApp, 
+            [data-testid="stAppViewContainer"], 
+            [data-testid="stMain"], 
+            .main, .block-container,
+            [data-testid="stMainBlockContainer"],
+            div[class^="st-"] {
                 overflow: visible !important;
                 overflow-y: visible !important;
-                position: relative !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                position: static !important;
+                display: block !important;
+                transform: none !important;
             }
-            
-            /* Remove margins so content stretches */
-            .stApp { margin-top: -50px !important; }
-            
-            /* Try to stop page breaks inside student cards */
-            div[data-testid="stExpander"] { 
-                page-break-inside: avoid !important; 
-                break-inside: avoid !important; 
+
+            /* 3. Stop cards from being sliced in half across pages */
+            div[data-testid="stExpander"] {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 20px !important;
+                display: block !important;
             }
-            
+
             /* Hide the expander toggle arrows */
             svg[data-testid="stExpanderToggleIcon"] { display: none !important; }
+
+            /* 4. Force background colors to print (e.g., PP and SEN tags) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
         }
         </style>
     """, unsafe_allow_html=True)
@@ -349,3 +362,4 @@ elif page == "Year 10":
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
     analytics(df_y7, df_y10)
+    
