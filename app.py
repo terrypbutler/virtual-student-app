@@ -51,10 +51,17 @@ elif page == "Year 7":
     if report_option == "Short Report (Portrait & Home Life)": mode = "Short"
     elif report_option == "Detailed Report (All Subjects)": mode = "Detailed"
 
-    # --- THE NEW EXPORT BUTTON ---
+    # --- THE EXPORT MENU ---
     st.sidebar.divider()
     st.sidebar.markdown("### 🖨️ Print & Export")
-    html_report = generate_printable_html(filtered_df, "Year 7", mode)
+    
+    print_selection = st.sidebar.radio(
+        "Select Content to Print",
+        ["Photo Grid Only", "Detailed Passports Only", "Both"]
+    )
+    
+    html_report = generate_printable_html(filtered_df, "Year 7", mode, print_selection)
+    
     st.sidebar.download_button(
         label="Download Printable Report",
         data=html_report,
@@ -62,7 +69,7 @@ elif page == "Year 7":
         mime="text/html",
         help="Downloads a perfectly formatted file. Open it and press Ctrl+P to print!"
     )
-    st.sidebar.caption("Open the downloaded file in your browser and press **Ctrl + P** for a perfect multi-page printout.")
+    st.sidebar.caption("Open the downloaded file in your browser and press **Ctrl + P** for a perfect multi-page printout. *(Remember to set your printer to Landscape if printing the Photo Grid!)*")
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     render_photo_grid(filtered_df, "Year 7", num_cols=5)
@@ -92,10 +99,17 @@ elif page == "Year 10":
     if report_option == "Short Report (KS3 & Home Life)": mode = "Short"
     elif report_option == "Detailed Report (All Subjects)": mode = "Detailed"
 
-    # --- THE NEW EXPORT BUTTON ---
+    # --- THE EXPORT MENU ---
     st.sidebar.divider()
     st.sidebar.markdown("### 🖨️ Print & Export")
-    html_report = generate_printable_html(filtered_df, "Year 10", mode)
+    
+    print_selection = st.sidebar.radio(
+        "Select Content to Print",
+        ["Photo Grid Only", "Detailed Passports Only", "Both"]
+    )
+    
+    html_report = generate_printable_html(filtered_df, "Year 10", mode, print_selection)
+    
     st.sidebar.download_button(
         label="Download Printable Report",
         data=html_report,
@@ -103,7 +117,7 @@ elif page == "Year 10":
         mime="text/html",
         help="Downloads a perfectly formatted file. Open it and press Ctrl+P to print!"
     )
-    st.sidebar.caption("Open the downloaded file in your browser and press **Ctrl + P** for a perfect multi-page printout.")
+    st.sidebar.caption("Open the downloaded file in your browser and press **Ctrl + P** for a perfect multi-page printout. *(Remember to set your printer to Landscape if printing the Photo Grid!)*")
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     render_photo_grid(filtered_df, "Year 10", num_cols=5)
