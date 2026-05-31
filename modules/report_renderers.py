@@ -3,6 +3,20 @@ from modules.ui_components import render_student_header, render_student_summary
 from modules.photo_utils import display_student_photo
 from modules.helpers import get_field
 
+def get_flexible_text(row, possible_names):
+    """Helper to find columns even if they have hidden spaces or weird capitalization."""
+    # Create a dictionary of all column names, but strictly lowercased and stripped of spaces
+    row_keys = {str(k).strip().lower(): k for k in row.keys()}
+    
+    for name in possible_names:
+        clean_name = name.lower().strip()
+        if clean_name in row_keys:
+            val = str(row[row_keys[clean_name]]).strip()
+            # Make sure it isn't an empty or "NaN" cell
+            if val and val.lower() not in ["nan", "none", "n/a", ""]:
+                return val
+    return None
+
 def render_student_card(row, cohort, show_subjects=False, show_projected=True, y7_report_type="None"):
     """
     Master rendering function. Adapts to Y7/Y9 and specific report requirements.
@@ -29,30 +43,43 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
             st.divider()
             st.markdown(f"### 📑 {y7_report_type} Report")
             
-            # Both Short and Detailed show these text fields
-            portrait = str(row.get("Transition Portrait", "")).strip()
-            if portrait and portrait.lower() != "nan":
+            # Bulletproof check for Portrait
+            portrait = get_flexible_text(row, ["Transition Portrait", "Transition portrait", "Portrait"])
+            if portrait:
                 st.markdown("**Transition Portrait:**")
                 st.write(portrait)
+            else:
+                st.caption("*(No Transition Portrait data found in spreadsheet)*")
                 
-            home_life = str(row.get("Home Life & Interests", "")).strip()
-            if home_life and home_life.lower() != "nan":
+            # Bulletproof check for Home Life
+            home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Home life & interests", "Interests"])
+            if home_life:
                 st.markdown("**Home Life & Interests:**")
                 st.write(home_life)
+            else:
+                st.caption("*(No Home Life data found in spreadsheet)*")
                 
             # Only Detailed shows the subjects table
             if y7_report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
-                y7_subjects = ["Maths", "English", "Creative Arts", "PE", "Sciences", "Humanities"]
-                available_y7 = {
-                    sub: row[sub] for sub in y7_subjects 
-                    if sub in row.index and str(row[sub]).strip() and str(row[sub]).strip().lower() != "nan"
-                }
+                y7_subjects = ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"]
+                
+                available_y7 = {}
+                row_keys_lower = {str(k).strip().lower(): k for k in row.keys()}
+                
+                # Bulletproof check for subjects
+                for sub in y7_subjects:
+                    sub_clean = sub.lower()
+                    if sub_clean in row_keys_lower:
+                        actual_key = row_keys_lower[sub_clean]
+                        val = str(row[actual_key]).strip()
+                        if val and val.lower() not in ["nan", "none", "n/a", ""]:
+                            available_y7[sub] = val
                 
                 if available_y7:
                     st.table(available_y7)
                 else:
-                    st.caption("No subject data available.")
+                    st.caption("*(No subject data found for this student)*")
 
         # --- 5. YEAR 9 SUBJECT REPORTS ---
         elif show_subjects and cohort == "Year 9":
@@ -70,20 +97,17 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
             if available:
                 st.table(available)
             else:
-                st.caption("No subject data available.")
+                st.caption("*(No subject data available)*")
 
 
 def render_photo_grid(df, cohort, num_cols=5):
     """
     Renders a strict grid of student photos with key demographic details.
-    Includes a metrics dashboard and conditional color-coding for SEN/PP/EAL.
-    Completely hides inactive/blank labels.
     """
     if df.empty:
         st.warning("No students found for this selection.")
         return
 
-    # Negative words to ignore when counting/highlighting flags
     ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN"]
 
     # --- 1. CALCULATE COHORT STATS ---
@@ -119,36 +143,27 @@ def render_photo_grid(df, cohort, num_cols=5):
             with col:
                 name = row.get("Full Name", "Unknown")
                 
-                # Extract raw values
                 sen_status = str(get_field(row, "sen_status")).strip()
                 sen_detail = str(get_field(row, "sen_detail")).strip()
                 pp_status = str(get_field(row, "pp")).strip()
                 eal_status = str(get_field(row, "eal")).strip()
                 
-                # Check if flags are active
                 sen_active = sen_status.upper() not in ignore_list
                 pp_active = pp_status.upper() not in ignore_list
                 eal_active = eal_status.upper() not in ignore_list
                 
-                # Render Photo and Name
                 display_student_photo(name, cohort)
                 st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
                 
-                # --- DYNAMIC LABEL BUILDER ---
                 active_labels = []
-                
                 if sen_active:
-                    # Only append the brackets if a detail actually exists
                     detail_str = f" ({sen_detail})" if sen_detail.upper() not in ignore_list else ""
                     active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}{detail_str}</span>")
-                    
                 if pp_active:
                     active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
-                    
                 if eal_active:
                     active_labels.append(f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>")
                 
-                # Only render the HTML block if there is at least one active label to show
                 if active_labels:
                     labels_combined = "<br>".join(active_labels)
                     details_html = f"""
