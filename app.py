@@ -40,7 +40,7 @@ page = st.sidebar.radio(
 )
 
 # ---------------------------
-# CSS PRINT INJECTION
+# CSS PRINT INJECTION (UPDATED)
 # ---------------------------
 def inject_print_css():
     st.markdown("""
@@ -51,8 +51,23 @@ def inject_print_css():
             header[data-testid="stHeader"] { display: none !important; }
             footer { display: none !important; }
             
+            /* FORCE THE BROWSER TO UNROLL THE SCROLLBOX FOR FULL PAGE PRINTING */
+            html, body, .stApp, section.main, .block-container {
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                overflow-y: visible !important;
+                position: relative !important;
+            }
+            
             /* Remove margins so content stretches */
             .stApp { margin-top: -50px !important; }
+            
+            /* Try to stop page breaks inside student cards */
+            div[data-testid="stExpander"] { 
+                page-break-inside: avoid !important; 
+                break-inside: avoid !important; 
+            }
             
             /* Hide the expander toggle arrows */
             svg[data-testid="stExpanderToggleIcon"] { display: none !important; }
