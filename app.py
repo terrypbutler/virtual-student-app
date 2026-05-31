@@ -131,7 +131,6 @@ def analytics(df_y7, df_y10):
     read_col = next((c for c in df.columns if c.strip().lower() in ["ks2 read", "ks2 reading", "sats reading", "reading score"]), None)
     math_col = next((c for c in df.columns if c.strip().lower() in ["ks2 maths", "ks2 math", "sats maths", "maths score"]), None)
     
-    # Official UK KS2 Scaled Score Bins (Locked)
     ks2_bins = [80, 85, 90, 95, 100, 105, 110, 115, 121] 
     ks2_labels = ["80-84", "85-89", "90-94", "95-99", "100-104", "105-109", "110-114", "115-120"]
     
@@ -145,7 +144,6 @@ def analytics(df_y7, df_y10):
             
             df_math = pd.DataFrame({"Score Range": ks2_labels, "Students": math_counts.values})
             
-            # Altair Chart with hardcoded Y-Axis max of 15
             chart_math = alt.Chart(df_math).mark_bar().encode(
                 x=alt.X('Score Range', sort=ks2_labels, title="Score Range"),
                 y=alt.Y('Students', scale=alt.Scale(domain=[0, 15]), title="Students")
@@ -164,7 +162,6 @@ def analytics(df_y7, df_y10):
             
             df_read = pd.DataFrame({"Score Range": ks2_labels, "Students": read_counts.values})
             
-            # Altair Chart with hardcoded Y-Axis max of 15
             chart_read = alt.Chart(df_read).mark_bar().encode(
                 x=alt.X('Score Range', sort=ks2_labels, title="Score Range"),
                 y=alt.Y('Students', scale=alt.Scale(domain=[0, 15]), title="Students")
@@ -174,8 +171,33 @@ def analytics(df_y7, df_y10):
             st.caption("*(No Reading data available)*")
 
     st.write("---")
+    
+    # --- RAW DATA TABLE WITH COHORT COLUMN FILTERS ---
     st.subheader("Raw Data")
-    st.dataframe(df, use_container_width=True)
+    
+    if analytics_cohort == "Year 7":
+        desired_cols = [
+            "Full Name", "Form Group", "Maths Set", "DoB", "Gender", 
+            "SEN Status", "Disadvantaged (PP)", "Ethnicity", "EAL Status", 
+            "SATs Reading", "SAT's Maths"
+        ]
+    else:
+        desired_cols = [
+            "Full Name", "Form Group", "Maths Set", "DoB", "Gender", 
+            "SEN Status", "SEND Detail", "Disadvantaged (PP)", "Ethnicity", 
+            "KS2 Read", "KS2 Maths", "EAL Status", "Eng Lang Predicted Grade", 
+            "Eng Lit Predicted Grade", "Maths Predicted Grade", "Sci 1 Predicted Grade", 
+            "Sci 2 Predicted Grade", "Art Predicted Grade", "Computing Predicted Grade", 
+            "Design Predicted Grade", "Drama Predicted Grade", "Geography Predicted Grade", 
+            "History Predicted Grade", "Hospitality Predicted Grade", "Music Predicted Grade", 
+            "Photography Predicted Grade", "Spanish Predicted Grade", "Sport Predicted Grade", 
+            "Attendance %", "Suspension days"
+        ]
+        
+    # Safety check: Only display columns that actually exist in the spreadsheet
+    final_cols = [col for col in desired_cols if col in df.columns]
+    
+    st.dataframe(df[final_cols], use_container_width=True)
 
 
 # ---------------------------
