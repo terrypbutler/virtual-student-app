@@ -197,18 +197,21 @@ def get_image_base64(name, cohort):
         except: return ""
     return ""
 
-def generate_printable_html(df, cohort, report_type):
+def generate_printable_html(df, cohort, report_type, print_selection):
     """Builds a beautiful, standalone HTML document formatted for A4 printing."""
     html = [
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Student Reports</title><style>",
-        "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222; line-height: 1.4; margin: 20px; }",
+        "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222; line-height: 1.4; margin: 15px; }",
         "@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .page-break { page-break-after: always; } }",
-        ".grid-container { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 30px; }",
-        ".grid-item { width: 145px; text-align: center; border: 1px solid #ddd; padding: 10px; border-radius: 8px; page-break-inside: avoid; }",
-        ".photo { width: 140px; height: 185px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }",
-        ".photo-placeholder { width: 140px; height: 185px; background: #eee; border-radius: 4px; display: inline-block; line-height: 185px; color: #999; border: 1px solid #ccc; }",
-        ".name { font-weight: bold; margin: 8px 0 4px 0; font-size: 14px; }",
-        ".tag { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-bottom: 2px; font-weight: bold; }",
+        
+        /* UPDATED CSS: Perfectly sized for 8-across in Landscape */
+        ".grid-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px; justify-content: flex-start; }",
+        ".grid-item { width: 110px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 8px; page-break-inside: avoid; margin-bottom: 6px; }",
+        ".photo { width: 100px; height: 130px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }",
+        ".photo-placeholder { width: 100px; height: 130px; background: #eee; border-radius: 4px; display: inline-block; line-height: 130px; color: #999; border: 1px solid #ccc; font-size: 11px; }",
+        ".name { font-weight: bold; margin: 6px 0 4px 0; font-size: 11px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }",
+        ".tag { display: inline-block; font-size: 9px; padding: 2px 4px; border-radius: 4px; margin-bottom: 2px; font-weight: bold; }",
+        
         ".tag-sen { background: #fee2e2; color: #b91c1c; } .tag-pp { background: #e0f2fe; color: #0369a1; } .tag-eal { background: #dcfce7; color: #15803d; }",
         ".card { border: 2px solid #2C3E50; border-radius: 8px; padding: 20px; margin-bottom: 30px; page-break-inside: avoid; }",
         ".header-row { display: flex; justify-content: space-between; margin-bottom: 15px; }",
@@ -223,73 +226,79 @@ def generate_printable_html(df, cohort, report_type):
     
     ignore_list = ["N/A", "NONE", "NO", "N", "", "FALSE", "NAN", "0", "0.0"]
     
-    # 1. GENERATE THE PHOTO GRID
-    html.append(f"<h2>{cohort} - Photo Overview</h2><div class='grid-container'>")
-    for _, row in df.iterrows():
-        name = row.get("Full Name", "Unknown")
-        img_b64 = get_image_base64(name, cohort)
-        sen_status = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
-        pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "PP"]) or ""
-        eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
-        
-        img_html = f"<img src='{img_b64}' class='photo'>" if img_b64 else "<div class='photo-placeholder'>No Photo</div>"
-        html.append(f"<div class='grid-item'>{img_html}<div class='name'>{name}</div>")
-        if sen_status.upper() not in ignore_list: html.append(f"<div class='tag tag-sen'>{sen_status}</div>")
-        if pp_status.upper() not in ignore_list: html.append(f"<div class='tag tag-pp'>PP</div>")
-        if eal_status.upper() not in ignore_list: html.append(f"<div class='tag tag-eal'>EAL: {eal_status}</div>")
+    # --- 1. GENERATE THE PHOTO GRID (IF REQUESTED) ---
+    if print_selection in ["Photo Grid Only", "Both"]:
+        html.append(f"<h2>{cohort} - Photo Overview</h2><div class='grid-container'>")
+        for _, row in df.iterrows():
+            name = row.get("Full Name", "Unknown")
+            img_b64 = get_image_base64(name, cohort)
+            sen_status = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
+            pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "PP"]) or ""
+            eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
+            
+            img_html = f"<img src='{img_b64}' class='photo'>" if img_b64 else "<div class='photo-placeholder'>No Photo</div>"
+            html.append(f"<div class='grid-item'>{img_html}<div class='name'>{name}</div>")
+            if sen_status.upper() not in ignore_list: html.append(f"<div class='tag tag-sen'>{sen_status}</div>")
+            if pp_status.upper() not in ignore_list: html.append(f"<div class='tag tag-pp'>PP</div>")
+            if eal_status.upper() not in ignore_list: html.append(f"<div class='tag tag-eal'>EAL: {eal_status}</div>")
+            html.append("</div>")
         html.append("</div>")
-    html.append("</div><div class='page-break'></div>")
+        
+        # Add a page break if we are printing both
+        if print_selection == "Both":
+            html.append("<div class='page-break'></div>")
     
-    # 2. GENERATE THE PASSPORTS
-    html.append(f"<h2>{cohort} - Detailed Passports</h2>")
-    for _, row in df.iterrows():
-        name = row.get("Full Name", "Unknown")
-        img_b64 = get_image_base64(name, cohort)
-        
-        html.append(f"<div class='card'><h3 style='margin-top:0;'>{name}</h3><div class='header-row'><div class='demo-grid'>")
-        
-        info = {
-            "Form Group": ["Form Tutor", "Tutor", "Form Group"], "Attendance": ["Attendance %", "Attendance"],
-            "SEN Status": ["SEN Status", "SEND Status"], "SEN Detail": ["SEN detail", "SEND detail"],
-            "Disadvantaged": ["Disadvantaged (PP)", "PP"], "KS2 Reading": ["KS2 Read", "KS2 Reading"], 
-            "KS2 Maths": ["KS2 Maths", "KS2 Math"]
-        }
-        
-        for label, keys in info.items():
-            val = get_flexible_text(row, keys) or ""
-            if "attendance" in label.lower() and val and "%" not in val: val += "%"
-            html.append(f"<div class='metric'><div class='metric-label'>{label}</div><div class='metric-value'>{val}</div></div>")
+    # --- 2. GENERATE THE PASSPORTS (IF REQUESTED) ---
+    if print_selection in ["Detailed Passports Only", "Both"]:
+        html.append(f"<h2>{cohort} - Detailed Passports</h2>")
+        for _, row in df.iterrows():
+            name = row.get("Full Name", "Unknown")
+            img_b64 = get_image_base64(name, cohort)
             
-        html.append(f"</div>") # End demo-grid
-        html.append(f"<img src='{img_b64}' class='photo' style='width:120px;height:160px;'>" if img_b64 else "<div class='photo-placeholder' style='width:120px;height:160px;line-height:160px;'>No Photo</div>")
-        html.append("</div>") # End header-row
-        
-        proj = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
-        if proj: html.append(f"<div style='background:#e8f4f8; padding:8px; border-radius:4px; border:1px solid #bce8f1;'><strong>Overall Projected Grade:</strong> {proj}</div>")
+            html.append(f"<div class='card'><h3 style='margin-top:0;'>{name}</h3><div class='header-row'><div class='demo-grid'>")
             
-        if cohort == "Year 7" and report_type != "None":
-            port = get_flexible_text(row, ["Transition Portrait", "Portrait"])
-            if port: html.append(f"<div class='section-title'>Transition Portrait</div><p>{port}</p>")
-            home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
-            if home: html.append(f"<div class='section-title'>Home Life & Interests</div><p>{home}</p>")
-            if report_type == "Detailed":
-                rows = [f"<tr><td style='font-weight:bold; width:30%;'>{s}</td><td>{get_flexible_text(row, [s])}</td></tr>" for s in ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"] if get_flexible_text(row, [s])]
-                if rows: html.append(f"<div class='section-title'>Subject Overviews</div><table>{''.join(rows)}</table>")
+            info = {
+                "Form Group": ["Form Tutor", "Tutor", "Form Group"], "Attendance": ["Attendance %", "Attendance"],
+                "SEN Status": ["SEN Status", "SEND Status"], "SEN Detail": ["SEN detail", "SEND detail"],
+                "Disadvantaged": ["Disadvantaged (PP)", "PP"], "KS2 Reading": ["KS2 Read", "KS2 Reading"], 
+                "KS2 Maths": ["KS2 Maths", "KS2 Math"]
+            }
+            
+            for label, keys in info.items():
+                val = get_flexible_text(row, keys) or ""
+                if "attendance" in label.lower() and val and "%" not in val: val += "%"
+                html.append(f"<div class='metric'><div class='metric-label'>{label}</div><div class='metric-value'>{val}</div></div>")
+                
+            html.append(f"</div>") # End demo-grid
+            html.append(f"<img src='{img_b64}' class='photo' style='width:120px;height:160px;'>" if img_b64 else "<div class='photo-placeholder' style='width:120px;height:160px;line-height:160px;'>No Photo</div>")
+            html.append("</div>") # End header-row
+            
+            proj = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
+            if proj: html.append(f"<div style='background:#e8f4f8; padding:8px; border-radius:4px; border:1px solid #bce8f1;'><strong>Overall Projected Grade:</strong> {proj}</div>")
+                
+            if cohort == "Year 7" and report_type != "None":
+                port = get_flexible_text(row, ["Transition Portrait", "Portrait"])
+                if port: html.append(f"<div class='section-title'>Transition Portrait</div><p>{port}</p>")
+                home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
+                if home: html.append(f"<div class='section-title'>Home Life & Interests</div><p>{home}</p>")
+                if report_type == "Detailed":
+                    rows = [f"<tr><td style='font-weight:bold; width:30%;'>{s}</td><td>{get_flexible_text(row, [s])}</td></tr>" for s in ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"] if get_flexible_text(row, [s])]
+                    if rows: html.append(f"<div class='section-title'>Subject Overviews</div><table>{''.join(rows)}</table>")
 
-        elif cohort == "Year 10" and report_type != "None":
-            ks3 = get_flexible_text(row, ["Key Stage 3 Report", "KS3 Report"])
-            if ks3: html.append(f"<div class='section-title'>Key Stage 3 Report</div><p>{ks3}</p>")
-            home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
-            if home: html.append(f"<div class='section-title'>Home Life & Interests</div><p>{home}</p>")
-            if report_type == "Detailed":
-                rows = []
-                for sub in ["Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama","Geography","History","Hospitality","Music","Photography","Spanish","Sport"]:
-                    grade = get_flexible_text(row, [sub])
-                    if grade:
-                        sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade"]) if sub.lower() != "science" else (get_flexible_text(row, ["Sci 1 Predicted Grade"]) or "") + ("-" + get_flexible_text(row, ["Sci 2 Predicted Grade"]) if get_flexible_text(row, ["Sci 2 Predicted Grade"]) else "")
-                        rows.append(f"<tr><td style='font-weight:bold;'>{sub}</td><td>{grade}</td><td>{sub_pred or proj or ''}</td></tr>")
-                if rows: html.append(f"<div class='section-title'>Subject Reports</div><table><tr><th>Subject</th><th>Current Grade</th><th>Predicted Grade</th></tr>{''.join(rows)}</table>")
-        html.append("</div>") # End card
-        
+            elif cohort == "Year 10" and report_type != "None":
+                ks3 = get_flexible_text(row, ["Key Stage 3 Report", "KS3 Report"])
+                if ks3: html.append(f"<div class='section-title'>Key Stage 3 Report</div><p>{ks3}</p>")
+                home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
+                if home: html.append(f"<div class='section-title'>Home Life & Interests</div><p>{home}</p>")
+                if report_type == "Detailed":
+                    rows = []
+                    for sub in ["Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama","Geography","History","Hospitality","Music","Photography","Spanish","Sport"]:
+                        grade = get_flexible_text(row, [sub])
+                        if grade:
+                            sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade"]) if sub.lower() != "science" else (get_flexible_text(row, ["Sci 1 Predicted Grade"]) or "") + ("-" + get_flexible_text(row, ["Sci 2 Predicted Grade"]) if get_flexible_text(row, ["Sci 2 Predicted Grade"]) else "")
+                            rows.append(f"<tr><td style='font-weight:bold;'>{sub}</td><td>{grade}</td><td>{sub_pred or proj or ''}</td></tr>")
+                    if rows: html.append(f"<div class='section-title'>Subject Reports</div><table><tr><th>Subject</th><th>Current Grade</th><th>Predicted Grade</th></tr>{''.join(rows)}</table>")
+            html.append("</div>") # End card
+            
     html.append("</body></html>")
     return "\n".join(html)
