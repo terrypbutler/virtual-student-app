@@ -62,7 +62,16 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
             items = list(info.items())
             for i, (label, keys) in enumerate(items):
                 value = get_val(keys)
-                cols[i % 2].metric(label, value)
+                
+                # --- NEW TEXT-WRAPPING HTML METRIC ---
+                # This replaces st.metric to prevent truncation
+                html_card = f"""
+                <div style='margin-bottom: 12px; line-height: 1.3;'>
+                    <span style='font-size: 0.85em; opacity: 0.7;'>{label}</span><br>
+                    <span style='font-size: 1.1em; font-weight: 600; display: inline-block; word-wrap: break-word;'>{value}</span>
+                </div>
+                """
+                cols[i % 2].markdown(html_card, unsafe_allow_html=True)
                 
         with right:
             display_student_photo(name, cohort)
@@ -112,7 +121,6 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
             st.divider()
             st.markdown(f"### 📑 {report_type} Report")
 
-            # Add KS3 Report
             ks3_report = get_flexible_text(row, ["Key Stage 3 Report", "KS3 Report", "Key Stage 3"])
             if ks3_report:
                 st.markdown("**Key Stage 3 Report:**")
@@ -120,7 +128,6 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
             elif report_type == "Detailed":
                 st.caption("*(No Key Stage 3 Report data found in spreadsheet)*")
 
-            # Add Home Life
             home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Home life & interests", "Interests"])
             if home_life:
                 st.markdown("**Home Life & Interests:**")
@@ -128,7 +135,6 @@ def render_student_card(row, cohort, show_projected=True, report_type="None"):
             elif report_type == "Detailed":
                 st.caption("*(No Home Life data found in spreadsheet)*")
 
-            # Build 3-column table if Detailed
             if report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
                 subject_cols = [
@@ -242,4 +248,3 @@ def render_photo_grid(df, cohort, num_cols=5):
                     st.markdown(details_html, unsafe_allow_html=True)
         
         st.write("---")
-        
