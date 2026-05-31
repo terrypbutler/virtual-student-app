@@ -1,11 +1,12 @@
 import streamlit as st
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 
 def display_student_photo(name, cohort):
     """
     Finds, crops, and displays the student's photo.
-    Splits the image (Left for Y7, Right for Y10) and trims the edges.
+    Splits the image (Left for Y7, Right for Y10), trims the edges,
+    and enforces a strict uniform size so all grid photos match perfectly.
     """
     photo_folder = "photos"
 
@@ -29,8 +30,8 @@ def display_student_photo(name, cohort):
             w, h = img.size
 
             # --- THE CROPPING MATH ---
-            top_trim = int(h * 0.08)     # Keeps the original 8% top trim
-            bottom_trim = int(h * 0.13)  # Increased from 8% to 13% to cut out text
+            top_trim = int(h * 0.08)     
+            bottom_trim = int(h * 0.13)  # Cuts out the text at the bottom
             
             top = top_trim
             bottom = h - bottom_trim
@@ -42,6 +43,12 @@ def display_student_photo(name, cohort):
                 crop = (w // 2, top, w, bottom)
 
             img = img.crop(crop)
+            
+            # --- FORCE UNIFORM SIZE ---
+            # ImageOps.fit crops and sizes the image to exactly 140x185 pixels.
+            # This ensures perfect grid alignment without stretching faces.
+            img = ImageOps.fit(img, (140, 185))
+
             st.image(img, width=140)
         else:
             st.caption("Photo missing")
