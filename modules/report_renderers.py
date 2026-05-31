@@ -220,7 +220,6 @@ def render_photo_grid(df, cohort, num_cols=5):
                 name = row.get("Full Name", "Unknown")
                 
                 sen_status = get_flexible_text(row, ["SEN Status", "SEND Status"]) or ""
-                sen_detail = get_flexible_text(row, ["SEN detail", "SEND detail"]) or ""
                 eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
                 pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP", "Premium"]) or ""
                 
@@ -233,8 +232,8 @@ def render_photo_grid(df, cohort, num_cols=5):
                 
                 active_labels = []
                 if sen_active:
-                    detail_str = f" ({sen_detail})" if sen_detail.upper() not in ignore_list else ""
-                    active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}{detail_str}</span>")
+                    # Simply displays the status without attaching the detail string!
+                    active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}</span>")
                 if pp_active:
                     active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
                 if eal_active:
