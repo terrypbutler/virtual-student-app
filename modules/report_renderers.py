@@ -30,7 +30,7 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
         with left:
             st.markdown(f"### {cohort} Profile")
             
-            # Smart Summary Generator (Replaces the old N/A logic)
+            # Smart Summary Generator
             def get_val(keys):
                 for k in keys:
                     for row_key in row.keys():
@@ -48,8 +48,8 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 "Ethnicity": ["Ethnicity"],
                 "EAL": ["EAL", "EAL Status"],
                 "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium", "PP"],
-                "KS2 Reading": ["KS2 Read", "KS2 Reading", "SATs Reading"], # UPDATED
-                "KS2 Maths": ["KS2 Maths", "KS2 Math", "SATs Maths"]        # UPDATED
+                "KS2 Reading": ["KS2 Read", "KS2 Reading", "SATs Reading"], 
+                "KS2 Maths": ["KS2 Maths", "KS2 Math", "SATs Maths"]        
             }
 
             cols = st.columns(2)
@@ -115,8 +115,25 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 grade = get_flexible_text(row, [sub])
                 
                 if grade: # Only list the subject if they have a current grade for it
-                    # Check for a subject-specific predicted grade (e.g. "Maths Predicted")
-                    sub_pred = get_flexible_text(row, [f"{sub} Predicted", f"Predicted {sub}", f"{sub} Projected", f"Projected {sub}"])
+                    
+                    # SPECIAL RULE FOR SCIENCE (Combining Sci 1 and Sci 2)
+                    if sub.lower() == "science":
+                        sci1 = get_flexible_text(row, ["Sci 1 Predicted Grade", "Sci 1 Predicted"])
+                        sci2 = get_flexible_text(row, ["Sci 2 Predicted Grade", "Sci 2 Predicted"])
+                        
+                        if sci1 and sci2:
+                            sub_pred = f"{sci1}-{sci2}"
+                        elif sci1:
+                            sub_pred = sci1
+                        elif sci2:
+                            sub_pred = sci2
+                        else:
+                            # Fallback if the columns aren't split
+                            sub_pred = get_flexible_text(row, ["Science Predicted Grade", "Science Predicted"])
+                    
+                    # STANDARD RULE FOR ALL OTHER SUBJECTS
+                    else:
+                        sub_pred = get_flexible_text(row, [f"{sub} Predicted Grade", f"{sub} Predicted", f"Predicted {sub}"])
                     
                     # Use specific prediction, otherwise global prediction, otherwise blank
                     final_pred = sub_pred if sub_pred else global_pred
