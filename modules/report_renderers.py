@@ -1,17 +1,18 @@
 import streamlit as st
-from modules.ui_components import render_student_header, render_student_summary
+import pandas as pd
 from modules.photo_utils import display_student_photo
 from modules.helpers import get_field
 
 def get_flexible_text(row, possible_names):
-    """Helper to find columns even if they have hidden spaces or weird capitalization."""
+    """Helper to find columns and strip out N/A values completely."""
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
     
     for name in possible_names:
         clean_name = name.lower().strip()
         if clean_name in row_keys:
             val = str(row[row_keys[clean_name]]).strip()
-            if val and val.lower() not in ["nan", "none", "n/a", ""]:
+            # If the value is empty or N/A, ignore it completely
+            if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
                 return val
     return None
 
@@ -22,19 +23,51 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
     name = row.get("Full Name", "Unknown")
     
     with st.expander(f"👤 {name}"):
-        # 1. Header & Photo
-        render_student_header(row, title=f"{cohort} Profile", cohort=cohort)
         
+        # --- 1. HEADER & SUMMARY DASHBOARD ---
+        left, right = st.columns([3, 1])
+        
+        with left:
+            st.markdown(f"### {cohort} Profile")
+            
+            # Smart Summary Generator (Replaces the old N/A logic)
+            def get_val(keys):
+                for k in keys:
+                    for row_key in row.keys():
+                        if str(row_key).strip().lower() == str(k).strip().lower():
+                            val = str(row[row_key]).strip()
+                            if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL"]:
+                                return val
+                return "" # Returns a perfect blank instead of N/A
+
+            info = {
+                "Form Group": ["Form Tutor", "Tutor", "Form Group"],
+                "Gender": ["Gender"],
+                "SEN Status": ["SEN Status", "SEND Status"],
+                "SEN Detail": ["SEN detail", "SEND detail"],
+                "Ethnicity": ["Ethnicity"],
+                "EAL": ["EAL", "EAL Status"],
+                "Disadvantaged": ["Premium", "Disadvantaged", "Pupil Premium", "PP"],
+                "KS2 Reading": ["KS2 Read", "KS2 Reading", "SATs Reading"], # UPDATED
+                "KS2 Maths": ["KS2 Maths", "KS2 Math", "SATs Maths"]        # UPDATED
+            }
+
+            cols = st.columns(2)
+            items = list(info.items())
+            for i, (label, keys) in enumerate(items):
+                value = get_val(keys)
+                cols[i % 2].metric(label, value)
+                
+        with right:
+            display_student_photo(name, cohort)
+            
         st.divider()
         
-        # 2. Summary Table
-        render_student_summary(row)
-        
-        # 3. Projected Grades
+        # 3. Projected Grades (Global)
         if show_projected:
-            proj = str(row.get("Projected Grade", "")).strip()
-            if proj and proj.lower() != "nan":
-                st.info(f"**Projected Grade:** {proj}")
+            proj = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
+            if proj:
+                st.info(f"**Overall Projected Grade:** {proj}")
                 
         # --- 4. YEAR 7 CUSTOM REPORTS ---
         if cohort == "Year 7" and y7_report_type != "None":
@@ -45,37 +78,26 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
             if portrait:
                 st.markdown("**Transition Portrait:**")
                 st.write(portrait)
-            else:
-                st.caption("*(No Transition Portrait data found in spreadsheet)*")
                 
             home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Home life & interests", "Interests"])
             if home_life:
                 st.markdown("**Home Life & Interests:**")
                 st.write(home_life)
-            else:
-                st.caption("*(No Home Life data found in spreadsheet)*")
                 
             if y7_report_type == "Detailed":
                 st.markdown("**Subject Overviews:**")
                 y7_subjects = ["Maths", "English", "Creative Arts", "PE", "Sciences", "Science", "Humanities"]
                 
                 available_y7 = {}
-                row_keys_lower = {str(k).strip().lower(): k for k in row.keys()}
-                
                 for sub in y7_subjects:
-                    sub_clean = sub.lower()
-                    if sub_clean in row_keys_lower:
-                        actual_key = row_keys_lower[sub_clean]
-                        val = str(row[actual_key]).strip()
-                        if val and val.lower() not in ["nan", "none", "n/a", ""]:
-                            available_y7[sub] = val
+                    val = get_flexible_text(row, [sub])
+                    if val:
+                        available_y7[sub] = val
                 
                 if available_y7:
                     st.table(available_y7)
-                else:
-                    st.caption("*(No subject data found for this student)*")
 
-        # --- 5. YEAR 10 SUBJECT REPORTS ---
+        # --- 5. YEAR 10 SUBJECT REPORTS (3-Column Table) ---
         elif show_subjects and cohort == "Year 10":
             st.subheader("Subject Reports")
             subject_cols = [
@@ -83,15 +105,32 @@ def render_student_card(row, cohort, show_subjects=False, show_projected=True, y
                 "Design","Drama","Geography","History","Hospitality","Music",
                 "Photography","Spanish","Sport"
             ]
-            available = {
-                sub: row[sub] for sub in subject_cols 
-                if sub in row.index and str(row[sub]).strip() and str(row[sub]).strip().lower() != "nan"
-            }
             
-            if available:
-                st.table(available)
-            else:
-                st.caption("*(No subject data available)*")
+            table_data = []
+            
+            # Grab the global predicted grade as a fallback
+            global_pred = get_flexible_text(row, ["Projected Grade", "Predicted Grade"]) or ""
+            
+            for sub in subject_cols:
+                grade = get_flexible_text(row, [sub])
+                
+                if grade: # Only list the subject if they have a current grade for it
+                    # Check for a subject-specific predicted grade (e.g. "Maths Predicted")
+                    sub_pred = get_flexible_text(row, [f"{sub} Predicted", f"Predicted {sub}", f"{sub} Projected", f"Projected {sub}"])
+                    
+                    # Use specific prediction, otherwise global prediction, otherwise blank
+                    final_pred = sub_pred if sub_pred else global_pred
+                    
+                    table_data.append({
+                        "Subject": sub,
+                        "Current Grade": grade,
+                        "Predicted Grade": final_pred
+                    })
+            
+            if table_data:
+                # Convert the data into a beautiful Pandas DataFrame table
+                df_subjects = pd.DataFrame(table_data)
+                st.table(df_subjects.set_index("Subject"))
 
 
 def render_photo_grid(df, cohort, num_cols=5):
