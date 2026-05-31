@@ -40,32 +40,29 @@ page = st.sidebar.radio(
 )
 
 # ---------------------------
-# CSS PRINT INJECTION (NUCLEAR OPTION)
+# CSS PRINT INJECTION (ABSOLUTE OVERRIDE)
 # ---------------------------
 def inject_print_css():
     st.markdown("""
         <style>
         @media print {
-            /* 1. Hide all the Streamlit UI elements */
-            header, [data-testid="stHeader"], [data-testid="stSidebar"], .stApp > header {
+            /* 1. Hide all Streamlit UI elements */
+            header, [data-testid="stHeader"], [data-testid="stSidebar"], .stApp > header, .stToolbar {
                 display: none !important;
             }
             
-            /* 2. Break every single scroll-lock container */
-            html, body, .stApp, 
+            /* 2. Break EVERY scroll-lock container from the root down */
+            html, body, #root, #root > div, .stApp, 
             [data-testid="stAppViewContainer"], 
             [data-testid="stMain"], 
-            .main, .block-container,
-            [data-testid="stMainBlockContainer"],
-            div[class^="st-"] {
-                overflow: visible !important;
-                overflow-y: visible !important;
+            [data-testid="stMainBlockContainer"], 
+            section, div {
                 height: auto !important;
                 min-height: auto !important;
                 max-height: none !important;
+                overflow: visible !important;
                 position: static !important;
                 display: block !important;
-                transform: none !important;
             }
 
             /* 3. Stop cards from being sliced in half across pages */
@@ -74,6 +71,13 @@ def inject_print_css():
                 break-inside: avoid !important;
                 margin-bottom: 20px !important;
                 display: block !important;
+            }
+
+            /* Force expander contents to fully display */
+            div[data-testid="stExpanderDetails"] {
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
             }
 
             /* Hide the expander toggle arrows */
@@ -291,7 +295,6 @@ elif page == "Year 7":
     st.subheader("📄 Detailed Passports")
     
     for _, row in filtered_df.iterrows():
-        # Pass the print_mode setting to the cards
         render_student_card(row, "Year 7", show_projected=True, report_type=mode, is_print_mode=print_mode)
 
 # ------------------ YEAR 10 ------------------
@@ -356,10 +359,8 @@ elif page == "Year 10":
     st.subheader("📄 Detailed Passports")
     
     for _, row in filtered_df.iterrows():
-        # Pass the print_mode setting to the cards
         render_student_card(row, "Year 10", show_projected=True, report_type=mode, is_print_mode=print_mode)
 
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
     analytics(df_y7, df_y10)
-    
