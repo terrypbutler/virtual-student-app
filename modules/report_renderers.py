@@ -204,7 +204,7 @@ def generate_printable_html(df, cohort, report_type, print_selection):
         "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222; line-height: 1.4; margin: 15px; }",
         "@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .page-break { page-break-after: always; } }",
         
-        /* UPDATED CSS: Perfectly sized for 8-across in Landscape */
+        "/* UPDATED CSS: Perfectly sized for 8-across in Landscape */",
         ".grid-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px; justify-content: flex-start; }",
         ".grid-item { width: 110px; text-align: center; border: 1px solid #ddd; padding: 6px; border-radius: 8px; page-break-inside: avoid; margin-bottom: 6px; }",
         ".photo { width: 100px; height: 130px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }",
