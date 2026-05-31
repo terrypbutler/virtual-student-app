@@ -17,10 +17,10 @@ YEAR_7_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyH
 YEAR_9_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEtyHGb0tW35YcgG0R6175_MvHnKkCSx-o6Aq7hvFOpjiobdoh7hmjULvIEdRWX8Ik/pub?gid=214766920&single=true&output=csv"
 
 # ---------------------------
-# DATA LOAD
+# DATA LOAD (Now loads both simultaneously)
 # ---------------------------
-selected_cohort = st.sidebar.radio("📅 Cohort", ["Year 7", "Year 9"])
-df = load_data(YEAR_7_URL if selected_cohort == "Year 7" else YEAR_9_URL)
+df_y7 = load_data(YEAR_7_URL)
+df_y9 = load_data(YEAR_9_URL)
 
 # ---------------------------
 # SIDEBAR NAV
@@ -41,8 +41,15 @@ page = st.sidebar.radio(
 # ---------------------------
 # SEARCH PAGE
 # ---------------------------
-def student_search(df):
+def student_search(df_y7, df_y9):
     st.title("🔍 Student Search (MIS View)")
+    
+    # Moved Cohort Selector inside the Search page
+    search_cohort = st.radio("Select Cohort to Search:", ["Year 7", "Year 9"], horizontal=True)
+    
+    # Pick the correct dataframe based on selection
+    df = df_y7 if search_cohort == "Year 7" else df_y9
+
     query = st.text_input("Search student name", key="search_name")
 
     if query:
@@ -53,13 +60,17 @@ def student_search(df):
             st.warning("No matches found.")
 
         for _, row in results.iterrows():
-            render_student_card(row, selected_cohort, show_subjects=True, show_projected=True)
+            render_student_card(row, search_cohort, show_subjects=True, show_projected=True)
 
 # ---------------------------
 # ANALYTICS
 # ---------------------------
-def analytics(df):
+def analytics(df_y7, df_y9):
     st.title("📊 Cohort Analytics Dashboard")
+
+    # Added Cohort Selector inside Analytics so it knows which data to show
+    analytics_cohort = st.radio("Select Cohort to Analyze:", ["Year 7", "Year 9"], horizontal=True)
+    df = df_y7 if analytics_cohort == "Year 7" else df_y9
 
     st.subheader("Overview")
     col1, col2, col3 = st.columns(3)
@@ -88,10 +99,13 @@ def analytics(df):
 # ROUTING & FILTERS
 # ---------------------------
 if page == "Student Search":
-    student_search(df)
+    student_search(df_y7, df_y9)
 
 # ------------------ YEAR 7 ------------------
 elif page == "Year 7 Passports":
+    # Automatically forces Year 7 data
+    df = df_y7 
+    
     st.sidebar.subheader("🔎 Filters (Year 7)")
 
     form_groups = safe_unique(df, "Form Group")
@@ -107,7 +121,6 @@ elif page == "Year 7 Passports":
     if selected_math:
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
 
-    # --- NEW REPORT SELECTOR ---
     report_option = st.sidebar.radio(
         "Select Report Detail",
         ["Base Passport (No Details)", "Short Report (Portrait & Home Life)", "Detailed Report (All Subjects)"]
@@ -124,7 +137,6 @@ elif page == "Year 7 Passports":
     # 1. Render the Grid First
     render_photo_grid(filtered_df, "Year 7", num_cols=5)
     
-    # Visual separator
     st.divider()
     st.subheader("📄 Detailed Passports")
     
@@ -134,6 +146,9 @@ elif page == "Year 7 Passports":
 
 # ------------------ YEAR 9 ------------------
 elif page == "Year 9 Transition":
+    # Automatically forces Year 9 data
+    df = df_y9 
+    
     st.sidebar.subheader("🔎 Filters (Year 9)")
 
     form_groups = safe_unique(df, "Form Group")
@@ -168,17 +183,14 @@ elif page == "Year 9 Transition":
 
     st.subheader(f"Showing {len(filtered_df)} Students")
     
-    # 1. Render the Grid First
     render_photo_grid(filtered_df, "Year 9", num_cols=5)
     
-    # Visual separator
     st.divider()
     st.subheader("📄 Detailed Passports")
     
-    # 2. Render the Detailed Cards Below
     for _, row in filtered_df.iterrows():
         render_student_card(row, "Year 9", show_subjects=is_full_report, show_projected=is_full_report)
 
 # ------------------ ANALYTICS ------------------
 elif page == "Analytics":
-    analytics(df)
+    analytics(df_y7, df_y9)
