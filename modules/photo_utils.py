@@ -1,53 +1,50 @@
-import os
 import streamlit as st
-from PIL import Image, ImageOps
+import os
+from PIL import Image
 
-from config import PHOTO_FOLDER, PHOTO_WIDTH
-
-@st.cache_resource
-def get_photo_map():
-    if not os.path.exists(PHOTO_FOLDER):
-        return {}
-    files = os.listdir(PHOTO_FOLDER)
-    return {f.lower(): f for f in files}
-
-photo_map = get_photo_map()
-
-
-def display_student_photo(student_name, cohort="Year 7"):
+def display_student_photo(name, cohort):
     """
-    Display student photo, left half for Year 7, right half for Year 9.
-    Forces uniform sizing for grid consistency.
+    Finds, crops, and displays the student's photo.
+    Splits the image (Left for Y7, Right for Y10) and trims the edges.
     """
-    safe_name = str(student_name).strip().replace(".", "")
-    filename = f"{safe_name.lower()}.png"
+    photo_folder = "photos"
 
-    if filename not in photo_map:
-        st.caption("*(Photo not found)*")
+    if not os.path.exists(photo_folder):
+        st.caption("No photo folder")
         return
 
-    path = os.path.join(PHOTO_FOLDER, photo_map[filename])
-
     try:
-        img = Image.open(path)
-        width, height = img.size
-        trim_amount = int(height * 0.08)  
-        top_edge = trim_amount
-        bottom_edge = height - trim_amount
+        # Clean up the name to match the file
+        safe_name = str(name).strip().lower()
+        safe_name = " ".join(safe_name.split())  # Removes double spaces
+        safe_name = safe_name.replace(".", "")
+        
+        filename = f"{safe_name}.png"
+        
+        # Create a dictionary of lowercase filenames to ensure a match
+        files = {f.lower(): f for f in os.listdir(photo_folder)}
 
-        if cohort == "Year 7":
-            crop_box = (0, top_edge, width // 2, bottom_edge)
+        if filename in files:
+            img = Image.open(os.path.join(photo_folder, files[filename]))
+            w, h = img.size
+
+            # --- THE CROPPING MATH ---
+            top_trim = int(h * 0.08)     # Keeps the original 8% top trim
+            bottom_trim = int(h * 0.13)  # Increased from 8% to 13% to cut out text
+            
+            top = top_trim
+            bottom = h - bottom_trim
+
+            # Split left side for Year 7, right side for Year 10
+            if cohort == "Year 7":
+                crop = (0, top, w // 2, bottom)
+            else:
+                crop = (w // 2, top, w, bottom)
+
+            img = img.crop(crop)
+            st.image(img, width=140)
         else:
-            crop_box = (width // 2, top_edge, width, bottom_edge)
+            st.caption("Photo missing")
 
-        cropped_img = img.crop(crop_box)
-
-        # Force exact uniform dimensions (300x400 is a standard 3:4 portrait)
-        # ImageOps.fit crops exactly from the center so faces are never squished
-        uniform_img = ImageOps.fit(cropped_img, (300, 400), centering=(0.5, 0.5))
-
-        # use_container_width allows the grid columns to dictate the final display size
-        st.image(uniform_img, use_container_width=True)
-
-    except Exception:
-        st.caption("*(File is corrupted or not a valid image)*")
+    except Exception as e:
+        st.caption("Image error")
