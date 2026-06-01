@@ -3,6 +3,7 @@ import pandas as pd
 import altair as alt
 from modules.data_loader import load_data
 from modules.report_renderers import render_student_card, render_photo_grid, generate_printable_html
+from modules.seating_planner import render_seating_plan
 
 def safe_unique(df, col):
     if col in df.columns:
