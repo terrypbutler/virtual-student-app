@@ -19,7 +19,7 @@ df_y10 = load_data(YEAR_10_URL)
 
 st.sidebar.title("🎓 Butler Academy")
 
-page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics"])
+page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan"])
 
 if page == "Student Search":
     st.title("🔍 Student Search (MIS View)")
@@ -181,3 +181,14 @@ elif page == "Analytics":
     st.subheader("Raw Data")
     desired_cols = ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "Disadvantaged (PP)", "Ethnicity", "EAL Status", "SATs Reading", "SAT's Maths"] if analytics_cohort == "Year 7" else ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "SEND Detail", "Disadvantaged (PP)", "Ethnicity", "KS2 Read", "KS2 Maths", "EAL Status", "Eng Lang Predicted Grade", "Eng Lit Predicted Grade", "Maths Predicted Grade", "Sci 1 Predicted Grade", "Sci 2 Predicted Grade", "Art Predicted Grade", "Computing Predicted Grade", "Design Predicted Grade", "Drama Predicted Grade", "Geography Predicted Grade", "History Predicted Grade", "Hospitality Predicted Grade", "Music Predicted Grade", "Photography Predicted Grade", "Spanish Predicted Grade", "Sport Predicted Grade", "Attendance %", "Suspension days"]
     st.dataframe(df[[col for col in desired_cols if col in df.columns]], use_container_width=True)
+
+elif page == "Seating Plan":
+    st.title("🪑 Classroom Layout")
+    cohort = st.radio("Select Cohort:", ["Year 7", "Year 10"], horizontal=True)
+    df_base = df_y7 if cohort == "Year 7" else df_y10
+    
+    # Apply your existing sidebar filters here so the dropdown only shows relevant students
+    # (Reuse the filter logic from your Year 7/10 blocks)
+    
+    from modules.seating_planner import render_seating_plan
+    render_seating_plan(df_base)
