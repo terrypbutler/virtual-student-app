@@ -172,15 +172,15 @@ def render_photo_grid(df, cohort, num_cols=5):
                 # If there are no tags, use a non-breaking space to hold the height
                 labels_html = "<br>".join(active_labels) if active_labels else "&nbsp;"
                 
-                # 3. Render Name and Tags in a single, locked-center container
+# 3. Render Name and Tags in a single, locked-center container (Brute Force Method)
                 st.markdown(f"""
-                    <div style='display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: 100%; text-align: center; margin-top: 5px; min-height: 65px;'>
-                        <div style='font-size: 14px; font-weight: bold; color: #2C3E50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-bottom: 2px;'>
+                    <div align="center" style="margin-top: 5px; min-height: 65px;">
+                        <p style="font-size: 14px; font-weight: bold; color: #2C3E50; margin-bottom: 2px; margin-top: 0px;">
                             {name}
-                        </div>
-                        <div style='font-size: 0.8em; line-height: 1.4;'>
+                        </p>
+                        <p style="font-size: 12px; line-height: 1.4; margin-top: 0px;">
                             {labels_html}
-                        </div>
+                        </p>
                     </div>
                 """, unsafe_allow_html=True)
                 
