@@ -183,13 +183,16 @@ elif page == "Analytics":
     desired_cols = ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "Disadvantaged (PP)", "Ethnicity", "EAL Status", "SATs Reading", "SAT's Maths"] if analytics_cohort == "Year 7" else ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "SEND Detail", "Disadvantaged (PP)", "Ethnicity", "KS2 Read", "KS2 Maths", "EAL Status", "Eng Lang Predicted Grade", "Eng Lit Predicted Grade", "Maths Predicted Grade", "Sci 1 Predicted Grade", "Sci 2 Predicted Grade", "Art Predicted Grade", "Computing Predicted Grade", "Design Predicted Grade", "Drama Predicted Grade", "Geography Predicted Grade", "History Predicted Grade", "Hospitality Predicted Grade", "Music Predicted Grade", "Photography Predicted Grade", "Spanish Predicted Grade", "Sport Predicted Grade", "Attendance %", "Suspension days"]
     st.dataframe(df[[col for col in desired_cols if col in df.columns]], use_container_width=True)
 
+# Inside your Seating Plan elif block in app.py:
 elif page == "Seating Plan":
-    st.title("🪑 Classroom Layout")
-    cohort = st.radio("Select Cohort:", ["Year 7", "Year 10"], horizontal=True)
+    st.title("🪑 Classroom Seating Planner")
+    
+    # Class selector matching your navigation
+    cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
     df_base = df_y7 if cohort == "Year 7" else df_y10
     
-    # Apply your existing sidebar filters here so the dropdown only shows relevant students
-    # (Reuse the filter logic from your Year 7/10 blocks)
+    # Reuse your existing filter logic here so the grid matches the navigation filters
+    # ... (apply your filters to df_base to create 'filtered_df') ...
     
     from modules.seating_planner import render_seating_plan
-    render_seating_plan(df_base)
+    render_seating_plan(filtered_df, cohort)
