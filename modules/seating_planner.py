@@ -126,7 +126,7 @@ def render_seating_plan(df, cohort):
         # --- THE VISUAL GRID ---
         if layout_choice == "Rows (4x8)":
             for r in range(4):
-                row_cols = st.columns(8)
+                row_cols = st.columns(8, gap="small")
                 for c in range(8):
                     seat_idx = (r * 8) + c
                     seat_key = f"seat_{seat_idx}"
@@ -138,24 +138,23 @@ def render_seating_plan(df, cohort):
         else:
             # Groups (8 Tables of 4)
             for grp_row in range(2):
-                table_cols = st.columns(4)
+                # Apply a medium gap between the large table blocks
+                table_cols = st.columns(4, gap="medium")
                 for grp_col in range(4):
                     table_idx = (grp_row * 4) + grp_col
                     with table_cols[grp_col]:
-                        st.markdown(f"<div style='text-align: center; padding: 5px; background-color: #ecf0f1; border-radius: 5px 5px 0 0; font-weight: bold; border: 1px solid #bdc3c7; border-bottom: none;'>Table {table_idx + 1}</div>", unsafe_allow_html=True)
                         
-                        # Container for the table layout
-                        with st.container():
-                            st.markdown("<div style='background-color: #fdfdfd; border: 1px solid #bdc3c7; border-radius: 0 0 5px 5px; padding: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+                        # Native Streamlit border container to strictly group the 4 seats
+                        with st.container(border=True):
+                            st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 15px; color: #2C3E50; border-bottom: 2px solid #3498db; padding-bottom: 5px;'>Table {table_idx + 1}</div>", unsafe_allow_html=True)
                             
                             seat_start = table_idx * 4
                             
-                            t1, t2 = st.columns(2)
+                            # Keep seats tight inside the table with gap="small"
+                            t1, t2 = st.columns(2, gap="small")
                             with t1: render_seat_ui(f"seat_{seat_start}", st.session_state.seats.get(f"seat_{seat_start}", "Empty"), next_student, cohort, df)
                             with t2: render_seat_ui(f"seat_{seat_start+1}", st.session_state.seats.get(f"seat_{seat_start+1}", "Empty"), next_student, cohort, df)
                             
-                            b1, b2 = st.columns(2)
+                            b1, b2 = st.columns(2, gap="small")
                             with b1: render_seat_ui(f"seat_{seat_start+2}", st.session_state.seats.get(f"seat_{seat_start+2}", "Empty"), next_student, cohort, df)
                             with b2: render_seat_ui(f"seat_{seat_start+3}", st.session_state.seats.get(f"seat_{seat_start+3}", "Empty"), next_student, cohort, df)
-                            
-                            st.markdown("</div>", unsafe_allow_html=True)
