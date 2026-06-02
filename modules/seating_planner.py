@@ -1,61 +1,54 @@
 import streamlit as st
+from modules.photo_utils import display_student_photo
 
-def render_seating_plan(df):
-    """
-    Renders a classroom grid where a user selects a student from a top-level 
-    dropdown and clicks a seat to assign them.
-    """
+def render_seating_plan(df, cohort):
     st.subheader("🪑 Interactive Seating Plan")
     
-    # Define classroom dimensions
     rows, cols = 5, 6
-    
-    # Initialize session state for seats if they don't exist
-    if 'seats' not in st.session_state:
-        st.session_state.seats = {}
+    if 'seats' not in st.session_state: st.session_state.seats = {}
+    if 'selected_for_placement' not in st.session_state: st.session_state.selected_for_placement = None
 
-    # Define the student list from the passed dataframe
-    student_list = df["Full Name"].tolist()
-    options = ["Empty"] + student_list
+    # Track who is already seated to grey them out
+    assigned_students = list(st.session_state.seats.values())
 
-    # --- Top-level selection UI ---
-    st.markdown("### 1. Select Student")
-    col_a, col_b = st.columns([3, 1])
-    
-    with col_a:
-        # This dropdown acts as your 'stamp' tool
-        student_to_place = st.selectbox("Select student to place in a seat:", options)
-    
-    with col_b:
-        st.write("") # Spacer to align with dropdown
-        st.write("")
-        if st.button("Clear All Seats", use_container_width=True):
-            st.session_state.seats = {}
-            st.rerun()
+    # --- 1. Selection Grid (The "Photo Grid") ---
+    st.markdown("### 1. Select Student to Place")
+    grid_cols = st.columns(8) # 8 per row as requested
+    for i, (_, row) in enumerate(df.iterrows()):
+        name = row["Full Name"]
+        is_assigned = name in assigned_students and name != st.session_state.selected_for_placement
+        
+        with grid_cols[i % 8]:
+            # Apply grey filter if assigned
+            opacity = 0.3 if is_assigned else 1.0
+            st.markdown(f'<div style="opacity: {opacity};">', unsafe_allow_html=True)
+            if st.button(name, key=f"sel_{name}", use_container_width=True):
+                st.session_state.selected_for_placement = name
+            display_student_photo(name, cohort)
+            st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- 2. Classroom Grid ---
     st.markdown("---")
-    st.markdown("### 2. Click a seat to assign the selected student")
-
-    # --- The Classroom Grid ---
-    # We loop through rows and columns to generate the grid
+    st.markdown("### 2. Click a seat to place: **" + str(st.session_state.selected_for_placement) + "**")
+    
     for r in range(rows):
         row_cols = st.columns(cols)
         for c in range(cols):
             seat_key = f"seat_{r}_{c}"
-            
-            # Get the current student in this specific seat, default to "Empty"
             current_val = st.session_state.seats.get(seat_key, "Empty")
             
-            # Styling: Use a different color if seat is occupied vs empty
-            btn_type = "primary" if current_val != "Empty" else "secondary"
-            
             with row_cols[c]:
-                # The seat button: Clicking it assigns the student selected in the dropdown
-                if st.button(current_val, key=seat_key, use_container_width=True, type=btn_type):
-                    if student_to_place != "Empty":
-                        st.session_state.seats[seat_key] = student_to_place
+                # Button shows name of seated student
+                if st.button(current_val if current_val != "Empty" else "+", key=seat_key, use_container_width=True):
+                    if st.session_state.selected_for_placement:
+                        st.session_state.seats[seat_key] = st.session_state.selected_for_placement
+                        st.session_state.selected_for_placement = None
                         st.rerun()
-                    else:
-                        # Clicking an occupied seat with "Empty" selected clears that seat
+                    elif current_val != "Empty": # Click to remove
                         st.session_state.seats[seat_key] = "Empty"
                         st.rerun()
+
+    if st.button("Clear Classroom"):
+        st.session_state.seats = {}
+        st.session_state.selected_for_placement = None
+        st.rerun()
