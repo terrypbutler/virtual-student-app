@@ -190,18 +190,36 @@ elif page == "Seating Plan":
     cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
     df_base = df_y7 if cohort == "Year 7" else df_y10
     
-    # 2. Build the sidebar filters (Added unique keys to prevent Streamlit errors)
+    # 2. Build the sidebar filters
     st.sidebar.subheader(f"🔎 Filters ({cohort})")
     selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df_base, "Form Group"), key="seat_form")
     selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df_base, "Maths Set"), key="seat_math")
+    
+    # --- NEW: Year 10 Option Class Dropdown ---
+    selected_subject = "All Subjects"
+    if cohort == "Year 10":
+        subject_cols = [
+            "Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design",
+            "Drama","Geography","History","Hospitality","Music","Photography",
+            "Spanish","Sport"
+        ]
+        available_subjects = [c for c in subject_cols if c in df_base.columns]
+        selected_subject = st.sidebar.selectbox("Option Class (optional)", ["All Subjects"] + available_subjects, key="seat_sub")
 
-    # 3. Create the filtered_df based on the user's choices
+    # 3. Create the filtered_df
     filtered_df = df_base.copy()
     if selected_form: 
         filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
     if selected_math: 
         filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
     
-    # 4. Pass the successfully created filtered_df into the planner
+    # Apply the Subject filter if it was used
+    if selected_subject != "All Subjects":
+        filtered_df = filtered_df[
+            filtered_df[selected_subject].notna() &
+            (filtered_df[selected_subject].astype(str).str.strip() != "")
+        ]
+    
+    # 4. Pass the fully filtered list into the planner
     from modules.seating_planner import render_seating_plan
     render_seating_plan(filtered_df, cohort)
