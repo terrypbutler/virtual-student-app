@@ -32,31 +32,34 @@ def get_student_dots(student_name, df):
         return ""
 
 def render_seat_ui(seat_key, current_val, next_student, cohort, df):
-    """Helper to consistently render the visual seat box."""
-    st.markdown("<div style='border: 1px solid #ddd; border-radius: 8px; padding: 5px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: white; margin-bottom: 10px;'>", unsafe_allow_html=True)
-    
+    """Helper to consistently render the visual seat box without row jumping."""
     if current_val == "Empty":
-        st.markdown("<div style='height: 80px; display: flex; align-items: center; justify-content: center; color: #ccc;'><em>Empty</em></div>", unsafe_allow_html=True)
+        # FIXED HEIGHT PLACEHOLDER: Prevents the rows from collapsing
+        st.markdown("""
+            <div style='height: 190px; display: flex; align-items: center; justify-content: center; 
+                        border: 2px dashed #ccc; border-radius: 8px; margin-bottom: 10px; 
+                        background: #fdfdfd; color: #aaa; font-size: 14px;'>
+                <em>Empty</em>
+            </div>
+        """, unsafe_allow_html=True)
+        
         if st.button("➕ Place", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
             if next_student:
                 st.session_state.seats[seat_key] = next_student
                 st.rerun()
     else:
+        # NATIVE STREAMLIT RENDERING: Ensures the images scale safely
         display_student_photo(current_val, cohort)
         
         dots = get_student_dots(current_val, df)
-        if dots:
-            st.markdown(f"<div style='text-align: center; font-size: 12px; margin: 2px 0;'>{dots}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='margin: 2px 0;'>&nbsp;</div>", unsafe_allow_html=True)
-            
-        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 5px;'>{current_val}</div>", unsafe_allow_html=True)
+        # min-height ensures that even if a student has NO dots, the name text doesn't jump up
+        st.markdown(f"<div style='text-align: center; font-size: 12px; margin: 2px 0; min-height: 18px;'>{dots if dots else ''}</div>", unsafe_allow_html=True)
         
-        if st.button("❌", key=f"rm_{seat_key}", use_container_width=True):
+        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px;'>{current_val}</div>", unsafe_allow_html=True)
+        
+        if st.button("❌ Remove", key=f"rm_{seat_key}", use_container_width=True):
             st.session_state.seats[seat_key] = "Empty"
             st.rerun()
-            
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_seating_plan(df, cohort):
@@ -134,7 +137,6 @@ def render_seating_plan(df, cohort):
                         
         else:
             # Groups (8 Tables of 4)
-            # We create 2 rows of 4 tables.
             for grp_row in range(2):
                 table_cols = st.columns(4)
                 for grp_col in range(4):
@@ -142,21 +144,18 @@ def render_seating_plan(df, cohort):
                     with table_cols[grp_col]:
                         st.markdown(f"<div style='text-align: center; padding: 5px; background-color: #ecf0f1; border-radius: 5px 5px 0 0; font-weight: bold; border: 1px solid #bdc3c7; border-bottom: none;'>Table {table_idx + 1}</div>", unsafe_allow_html=True)
                         
-                        # Create a stylized "Table" container
+                        # Container for the table layout
                         with st.container():
                             st.markdown("<div style='background-color: #fdfdfd; border: 1px solid #bdc3c7; border-radius: 0 0 5px 5px; padding: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
                             
                             seat_start = table_idx * 4
                             
-                            # Top two seats at the table
                             t1, t2 = st.columns(2)
                             with t1: render_seat_ui(f"seat_{seat_start}", st.session_state.seats.get(f"seat_{seat_start}", "Empty"), next_student, cohort, df)
                             with t2: render_seat_ui(f"seat_{seat_start+1}", st.session_state.seats.get(f"seat_{seat_start+1}", "Empty"), next_student, cohort, df)
                             
-                            # Bottom two seats at the table
                             b1, b2 = st.columns(2)
                             with b1: render_seat_ui(f"seat_{seat_start+2}", st.session_state.seats.get(f"seat_{seat_start+2}", "Empty"), next_student, cohort, df)
                             with b2: render_seat_ui(f"seat_{seat_start+3}", st.session_state.seats.get(f"seat_{seat_start+3}", "Empty"), next_student, cohort, df)
                             
                             st.markdown("</div>", unsafe_allow_html=True)
-                            
