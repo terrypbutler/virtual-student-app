@@ -172,9 +172,9 @@ def render_photo_grid(df, cohort, num_cols=5):
                 # If there are no tags, use a non-breaking space to hold the height
                 labels_html = "<br>".join(active_labels) if active_labels else "&nbsp;"
                 
-# 3. Render Name and Tags in a single, locked-center container (Brute Force Method)
+# 3. Render Name and Tags locked to the left edge to match the photo
                 st.markdown(f"""
-                    <div align="center" style="margin-top: 5px; min-height: 65px;">
+                    <div style="text-align: left; margin-top: 5px; min-height: 65px;">
                         <p style="font-size: 14px; font-weight: bold; color: #2C3E50; margin-bottom: 2px; margin-top: 0px;">
                             {name}
                         </p>
