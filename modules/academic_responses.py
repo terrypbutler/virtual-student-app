@@ -17,9 +17,8 @@ def get_flexible_text(row, possible_names):
                 return val
     return "Unknown"
 
-def fetch_ai_answers(question, student_subset, instructions, uploaded_file):
+ddef fetch_ai_answers(question, student_subset, instructions, uploaded_file):
     """Centralized function to call Gemini and return a dictionary of answers."""
-    # Build the profile list
     profiles = []
     for _, row in student_subset.iterrows():
         name = row.get("Full Name")
@@ -42,22 +41,26 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file):
     CRITICAL: Return ONLY a valid JSON dictionary where the keys are the exact student names and the values are their answers. Do not include any other text.
     """
     
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    contents = [prompt]
-    if uploaded_file is not None:
-        contents.append(Image.open(uploaded_file))
-        
-    response = model.generate_content(
-        contents, 
-        generation_config={"response_mime_type": "application/json"}
-    )
-    
-    # Clean and parse the JSON safely
     try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        contents = [prompt]
+        if uploaded_file is not None:
+            contents.append(Image.open(uploaded_file))
+            
+        response = model.generate_content(
+            contents, 
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
+        
     except Exception as e:
-        st.error("Failed to parse AI response. Please try asking again.")
+        error_msg = str(e)
+        if "ResourceExhausted" in error_msg or "429" in error_msg:
+            st.error("🚦 **Whoa there! You've hit the AI speed limit.** (Google limits how much data you can generate per minute on the free tier). Please wait 60 seconds and try again!")
+        else:
+            st.error("Failed to fetch AI response. Please check your question and try again.")
         return {}
 
 def render_academic_responses(df, cohort):
