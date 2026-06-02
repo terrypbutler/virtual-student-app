@@ -244,7 +244,6 @@ elif page == "Academic AfL":
     st.sidebar.subheader(f"🔎 Class Setup ({cohort})")
     
     # 1. First Dropdown: Select the Subject
-    # Pulling the subjects from your existing database structure
     all_subjects = ["Maths", "Science", "English", "Art", "Computing", "Design", "Drama", "Geography", "History", "Hospitality", "Music", "Photography", "Spanish", "Sport"]
     selected_subject = st.sidebar.selectbox("What subject are you teaching?", all_subjects, key="afl_sub")
     
@@ -252,28 +251,20 @@ elif page == "Academic AfL":
     
     # 2. Conditional Dropdowns: The "If Maths/Science" Logic
     if selected_subject in ["Maths", "Science"]:
-        # Show Sets
         available_sets = safe_unique(df_base, "Maths Set")
         selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="afl_set")
-        
         if selected_set != "All Sets":
             filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
             
     else:
-        # Show Tutor Groups for everything else
         available_forms = safe_unique(df_base, "Form Group")
         selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="afl_form")
-        
         if selected_form != "All Tutor Groups":
             filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
             
     # 3. Smart Option-Block Filtering (Year 10 Only)
-    # If they are teaching Year 10, remove kids who didn't pick this subject!
     if cohort == "Year 10" and selected_subject in df_base.columns and selected_subject not in ["Maths", "Science", "English"]:
-        filtered_df = filtered_df[
-            filtered_df[selected_subject].notna() & 
-            (filtered_df[selected_subject].astype(str).str.strip() != "")
-        ]
+        filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
         
     st.sidebar.divider()
     st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
