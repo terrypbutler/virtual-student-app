@@ -51,6 +51,7 @@ def render_academic_responses(df, cohort):
                 
                 # Build the prompt forcing JSON output
                 prompt = f"""
+                If the answer requires mathematics, format it simply using standard keyboard symbols (like x^2) or Unicode (like x²). Do not use complex LaTeX.
                 You are simulating a class of students writing answers on mini-whiteboards.
                 The teacher has asked: "{teacher_question}"
                 
