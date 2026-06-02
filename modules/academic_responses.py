@@ -160,24 +160,25 @@ def render_academic_responses(df, cohort, subject="General"):
                                 ans = answers.get(name, "?")
                                 st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span></div>", unsafe_allow_html=True)
 
-    # --- MODE: EXIT TICKETS ---
+   # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
-        st.caption("Collects a detailed paragraph from a 'Targeted Marking Pile' of 8 students.")
+        st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
-            with st.spinner("Students are writing..."):
-                target_df = df.sample(n=min(8, len(df))) 
+            with st.spinner("Students are writing their paragraphs (this may take a moment for a full class)..."):
+                
+                # We removed the target_df limit here so it uses the full 'df'
                 instructions = "Generate a detailed, full-sentence explanation (2 to 4 sentences) for EACH student. Include bracketed visual formatting descriptions."
-                answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
+                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers: 
-                    st.success("✅ Exit tickets collected!")
+                    st.success("✅ All exit tickets collected!")
                     
-                    # --- NEW: The Download Button ---
-                    html_worksheet = create_printable_worksheet(teacher_question, answers, target_df, subject, cohort)
+                    # Pass the full 'df' to the worksheet generator
+                    html_worksheet = create_printable_worksheet(teacher_question, answers, df, subject, cohort)
                     st.download_button(
                         label="🖨️ Download as Printable Worksheet",
                         data=html_worksheet,
-                        file_name=f"{cohort}_{subject}_Marking_Exercise.html",
+                        file_name=f"{cohort}_{subject}_Full_Class_Marking_Exercise.html",
                         mime="text/html",
                         help="Downloads a perfectly formatted file. Open it in your browser and press Ctrl+P to print!",
                         type="secondary",
@@ -185,16 +186,15 @@ def render_academic_responses(df, cohort, subject="General"):
                     )
                     st.markdown("---")
                     
-                    # Still display them on screen as a preview
-                    st.markdown(f"### 📑 On-Screen Preview ({len(target_df)} selected at random)")
-                    for _, row in target_df.iterrows():
+                    # Display the full class on screen
+                    st.markdown(f"### 📑 On-Screen Preview (Full Class)")
+                    for _, row in df.iterrows():
                         name = row.get("Full Name")
                         ans = answers.get(name, "No ticket submitted.")
                         with st.expander(f"🎫 {name}'s Ticket"):
                             col1, col2 = st.columns([1, 5])
                             with col1: display_student_photo(name, cohort)
                             with col2: st.write(ans)
-
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
         st.caption("Simulates 5 students volunteering to answer the question.")
