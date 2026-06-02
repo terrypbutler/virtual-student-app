@@ -160,16 +160,30 @@ def render_photo_grid(df, cohort, num_cols=5):
                 eal_status = get_flexible_text(row, ["EAL", "EAL Status"]) or ""
                 pp_status = get_flexible_text(row, ["Disadvantaged (PP)", "Disadvantaged", "Pupil Premium", "PP"]) or ""
                 
+                # 1. Draw the photo natively
                 display_student_photo(name, cohort)
-                st.markdown(f"<p style='text-align: center; font-weight: bold; margin-bottom: 2px;'>{name}</p>", unsafe_allow_html=True)
                 
+                # 2. Build the tags
                 active_labels = []
                 if sen_status.upper() not in ignore_list: active_labels.append(f"<span style='color: #D32F2F; font-weight: bold;'>{sen_status}</span>")
                 if pp_status.upper() not in ignore_list: active_labels.append("<span style='color: #1976D2; font-weight: bold;'>PP</span>")
                 if eal_status.upper() not in ignore_list: active_labels.append(f"<span style='color: #388E3C; font-weight: bold;'>EAL: {eal_status}</span>")
                 
-                if active_labels:
-                    st.markdown(f"<div style='text-align: center; font-size: 0.8em; line-height: 1.4; padding-bottom: 10px;'>{'<br>'.join(active_labels)}</div>", unsafe_allow_html=True)
+                # If there are no tags, use a non-breaking space to hold the height
+                labels_html = "<br>".join(active_labels) if active_labels else "&nbsp;"
+                
+                # 3. Render Name and Tags in a single, locked-center container
+                st.markdown(f"""
+                    <div style='display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: 100%; text-align: center; margin-top: 5px; min-height: 65px;'>
+                        <div style='font-size: 14px; font-weight: bold; color: #2C3E50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; margin-bottom: 2px;'>
+                            {name}
+                        </div>
+                        <div style='font-size: 0.8em; line-height: 1.4;'>
+                            {labels_html}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
         st.write("---")
 
 # -------------------------------------------------------------------
