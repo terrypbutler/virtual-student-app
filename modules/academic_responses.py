@@ -17,7 +17,7 @@ def get_flexible_text(row, possible_names):
                 return val
     return "Unknown"
 
-ddef fetch_ai_answers(question, student_subset, instructions, uploaded_file):
+def fetch_ai_answers(question, student_subset, instructions, uploaded_file):
     """Centralized function to call Gemini and return a dictionary of answers."""
     profiles = []
     for _, row in student_subset.iterrows():
@@ -91,7 +91,6 @@ def render_academic_responses(df, cohort):
     
     st.markdown("---")
     
-    # Check if a question is asked before running any mode
     if not teacher_question:
         st.info("👆 Please type a question above to begin.")
         return
@@ -104,85 +103,54 @@ def render_academic_responses(df, cohort):
                 instructions = "Generate a realistic, short answer (maximum 6 words) for EACH student based on their profile. Include common misconceptions for lower grades."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file)
                 
-                # Render Grid
-                st.markdown("### Classroom Whiteboards")
-                num_cols = 5
-                for i in range(0, len(df), num_cols):
-                    cols = st.columns(num_cols)
-                    for col, (_, row) in zip(cols, df.iloc[i : i + num_cols].iterrows()):
-                        with col:
-                            name = row.get("Full Name")
-                            display_student_photo(name, cohort)
-                            st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
-                            
-                            ans = answers.get(name, "?")
-                            st.markdown(f"""
-                                <div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; 
-                                            padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; 
-                                            align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'>
-                                    <span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span>
-                                </div>
-                            """, unsafe_allow_html=True)
+                if answers:
+                    st.markdown("### Classroom Whiteboards")
+                    num_cols = 5
+                    for i in range(0, len(df), num_cols):
+                        cols = st.columns(num_cols)
+                        for col, (_, row) in zip(cols, df.iloc[i : i + num_cols].iterrows()):
+                            with col:
+                                name = row.get("Full Name")
+                                display_student_photo(name, cohort)
+                                st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
+                                
+                                ans = answers.get(name, "?")
+                                st.markdown(f"""
+                                    <div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; 
+                                                padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; 
+                                                align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'>
+                                        <span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span>
+                                    </div>
+                                """, unsafe_allow_html=True)
 
     # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
-        st.caption("Collects a full, detailed paragraph from every student to check deep understanding.")
+        st.caption("Collects a detailed paragraph from a 'Targeted Marking Pile' of 8 students to check deep understanding.")
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their paragraphs..."):
-                instructions = "Generate a detailed, full-sentence explanation (2 to 3 sentences) for EACH student. Reflect their predicted grade in the depth and accuracy of their writing."
-                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file)
                 
-                st.markdown("### Collected Tickets")
-                for _, row in df.iterrows():
-                    name = row.get("Full Name")
-                    ans = answers.get(name, "No ticket submitted.")
-                    with st.expander(f"🎫 {name}'s Ticket"):
-                        col1, col2 = st.columns([1, 5])
-                        with col1:
-                            display_student_photo(name, cohort)
-                        with col2:
-                            st.write(ans)
+                # API SAVER: Only process a maximum of 8 students for detailed paragraphs
+                target_df = df.sample(n=min(8, len(df))) 
+                
+                instructions = "Generate a detailed, full-sentence explanation (2 to 3 sentences) for EACH student. Reflect their predicted grade in the depth and accuracy of their writing."
+                answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file)
+                
+                if answers: 
+                    st.markdown(f"### 📑 Teacher's Marking Pile ({len(target_df)} selected at random)")
+                    for _, row in target_df.iterrows():
+                        name = row.get("Full Name")
+                        ans = answers.get(name, "No ticket submitted.")
+                        with st.expander(f"🎫 {name}'s Ticket"):
+                            col1, col2 = st.columns([1, 5])
+                            with col1:
+                                display_student_photo(name, cohort)
+                            with col2:
+                                st.write(ans)
 
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
         st.caption("Simulates 5 students volunteering to answer the question.")
         if st.button("See who raised their hand...", type="primary"):
             with st.spinner("Looking around the room..."):
-                # Pick 5 random students
                 volunteers_df = df.sample(n=min(5, len(df)))
-                instructions = "Generate a spoken, conversational answer for EACH of these volunteering students. They are volunteering, so they generally feel confident, though they might still be slightly wrong."
-                answers = fetch_ai_answers(teacher_question, volunteers_df, instructions, uploaded_file)
-                
-                st.markdown("### 🖐️ Volunteers")
-                for _, row in volunteers_df.iterrows():
-                    name = row.get("Full Name")
-                    ans = answers.get(name, "...")
-                    
-                    st.markdown(f"""
-                        <div style='background-color: #f8f9fa; border-left: 5px solid #f1c40f; padding: 15px; margin-bottom: 10px; border-radius: 4px;'>
-                            <strong>{name} raises their hand:</strong> "{ans}"
-                        </div>
-                    """, unsafe_allow_html=True)
-
-    # --- MODE: COLD CALL ---
-    elif mode == "🎯 Cold Call (Targeted)":
-        st.caption("Select a specific student and put them on the spot.")
-        target_name = st.selectbox("Select student to Cold Call:", df["Full Name"].tolist())
-        
-        if st.button(f"Ask {target_name}", type="primary"):
-            with st.spinner(f"Waiting for {target_name} to answer..."):
-                target_df = df[df["Full Name"] == target_name]
-                instructions = "Generate a spoken, conversational answer for this specific student. Because they were cold-called, they might hesitate or use filler words ('Umm', 'I think...') depending on their confidence and grade."
-                answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file)
-                
-                ans = answers.get(target_name, "...")
-                
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    display_student_photo(target_name, cohort)
-                with col2:
-                    st.markdown(f"""
-                        <div style='background-color: #e8f4f8; border: 1px solid #bce8f1; padding: 20px; border-radius: 8px; font-size: 16px;'>
-                            🗣️ <strong>{target_name}:</strong> "{ans}"
-                        </div>
-                    """, unsafe_allow_html=True)
+                instructions = "Generate a spoken, conversational answer for
