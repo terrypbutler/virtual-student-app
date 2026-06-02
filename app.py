@@ -183,16 +183,25 @@ elif page == "Analytics":
     desired_cols = ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "Disadvantaged (PP)", "Ethnicity", "EAL Status", "SATs Reading", "SAT's Maths"] if analytics_cohort == "Year 7" else ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "SEND Detail", "Disadvantaged (PP)", "Ethnicity", "KS2 Read", "KS2 Maths", "EAL Status", "Eng Lang Predicted Grade", "Eng Lit Predicted Grade", "Maths Predicted Grade", "Sci 1 Predicted Grade", "Sci 2 Predicted Grade", "Art Predicted Grade", "Computing Predicted Grade", "Design Predicted Grade", "Drama Predicted Grade", "Geography Predicted Grade", "History Predicted Grade", "Hospitality Predicted Grade", "Music Predicted Grade", "Photography Predicted Grade", "Spanish Predicted Grade", "Sport Predicted Grade", "Attendance %", "Suspension days"]
     st.dataframe(df[[col for col in desired_cols if col in df.columns]], use_container_width=True)
 
-# Inside your Seating Plan elif block in app.py:
 elif page == "Seating Plan":
     st.title("🪑 Classroom Seating Planner")
     
-    # Class selector matching your navigation
+    # 1. Select the base data
     cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
     df_base = df_y7 if cohort == "Year 7" else df_y10
     
-    # Reuse your existing filter logic here so the grid matches the navigation filters
-    # ... (apply your filters to df_base to create 'filtered_df') ...
+    # 2. Build the sidebar filters (Added unique keys to prevent Streamlit errors)
+    st.sidebar.subheader(f"🔎 Filters ({cohort})")
+    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df_base, "Form Group"), key="seat_form")
+    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df_base, "Maths Set"), key="seat_math")
+
+    # 3. Create the filtered_df based on the user's choices
+    filtered_df = df_base.copy()
+    if selected_form: 
+        filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
+    if selected_math: 
+        filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
     
+    # 4. Pass the successfully created filtered_df into the planner
     from modules.seating_planner import render_seating_plan
     render_seating_plan(filtered_df, cohort)
