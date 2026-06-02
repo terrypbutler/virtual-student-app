@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import google.generativeai as genai
 from modules.data_loader import load_data
 from modules.report_renderers import render_student_card, render_photo_grid, generate_printable_html
 from modules.seating_planner import render_seating_plan
@@ -20,7 +21,7 @@ df_y10 = load_data(YEAR_10_URL)
 
 st.sidebar.title("🎓 Butler Academy")
 
-page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan"])
+page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator"])
 
 if page == "Student Search":
     st.title("🔍 Student Search (MIS View)")
@@ -223,3 +224,13 @@ elif page == "Seating Plan":
     # 4. Pass the fully filtered list into the planner
     from modules.seating_planner import render_seating_plan
     render_seating_plan(filtered_df, cohort)
+
+elif page == "Simulator":
+    st.title("🎭 ITT Roleplay Simulator")
+
+    # Use the exact same filter setup you use on the seating plan to narrow down the student list!
+    cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
+    df_base = df_y7 if cohort == "Year 7" else df_y10
+
+    from modules.student_simulator import render_simulator
+    render_simulator(df_base, cohort)
