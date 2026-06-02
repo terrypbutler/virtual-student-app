@@ -21,7 +21,7 @@ df_y10 = load_data(YEAR_10_URL)
 
 st.sidebar.title("🎓 Butler Academy")
 
-page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator"])
+page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL"])
 
 if page == "Student Search":
     st.title("🔍 Student Search (MIS View)")
@@ -234,3 +234,22 @@ elif page == "Simulator":
 
     from modules.student_simulator import render_simulator
     render_simulator(df_base, cohort)
+
+elif page == "Academic AfL":
+    st.title("🧠 Academic Response Simulator")
+    
+    # Use the exact same filter setup so the trainee can select a specific class
+    cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
+    df_base = df_y7 if cohort == "Year 7" else df_y10
+    
+    st.sidebar.subheader(f"🔎 Filters ({cohort})")
+    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df_base, "Form Group"), key="afl_form")
+    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df_base, "Maths Set"), key="afl_math")
+    
+    filtered_df = df_base.copy()
+    if selected_form: filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
+    if selected_math: filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
+    
+    # Render the module!
+    from modules.academic_responses import render_academic_responses
+    render_academic_responses(filtered_df, cohort)
