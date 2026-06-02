@@ -153,4 +153,41 @@ def render_academic_responses(df, cohort):
         if st.button("See who raised their hand...", type="primary"):
             with st.spinner("Looking around the room..."):
                 volunteers_df = df.sample(n=min(5, len(df)))
-                instructions = "Generate a spoken, conversational answer for
+                instructions = "Generate a spoken, conversational answer for EACH of these volunteering students. They are volunteering, so they generally feel confident, though they might still be slightly wrong."
+                answers = fetch_ai_answers(teacher_question, volunteers_df, instructions, uploaded_file)
+                
+                if answers:
+                    st.markdown("### 🖐️ Volunteers")
+                    for _, row in volunteers_df.iterrows():
+                        name = row.get("Full Name")
+                        ans = answers.get(name, "...")
+                        
+                        st.markdown(f"""
+                            <div style='background-color: #f8f9fa; border-left: 5px solid #f1c40f; padding: 15px; margin-bottom: 10px; border-radius: 4px;'>
+                                <strong>{name} raises their hand:</strong> "{ans}"
+                            </div>
+                        """, unsafe_allow_html=True)
+
+    # --- MODE: COLD CALL ---
+    elif mode == "🎯 Cold Call (Targeted)":
+        st.caption("Select a specific student and put them on the spot.")
+        target_name = st.selectbox("Select student to Cold Call:", df["Full Name"].tolist())
+        
+        if st.button(f"Ask {target_name}", type="primary"):
+            with st.spinner(f"Waiting for {target_name} to answer..."):
+                target_df = df[df["Full Name"] == target_name]
+                instructions = "Generate a spoken, conversational answer for this specific student. Because they were cold-called, they might hesitate or use filler words ('Umm', 'I think...') depending on their confidence and grade."
+                answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file)
+                
+                if answers:
+                    ans = answers.get(target_name, "...")
+                    
+                    col1, col2 = st.columns([1, 4])
+                    with col1:
+                        display_student_photo(target_name, cohort)
+                    with col2:
+                        st.markdown(f"""
+                            <div style='background-color: #e8f4f8; border: 1px solid #bce8f1; padding: 20px; border-radius: 8px; font-size: 16px;'>
+                                🗣️ <strong>{target_name}:</strong> "{ans}"
+                            </div>
+                        """, unsafe_allow_html=True)
