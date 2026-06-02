@@ -238,18 +238,46 @@ elif page == "Simulator":
 elif page == "Academic AfL":
     st.title("🧠 Academic Response Simulator")
     
-    # Use the exact same filter setup so the trainee can select a specific class
     cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
     df_base = df_y7 if cohort == "Year 7" else df_y10
     
-    st.sidebar.subheader(f"🔎 Filters ({cohort})")
-    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df_base, "Form Group"), key="afl_form")
-    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df_base, "Maths Set"), key="afl_math")
+    st.sidebar.subheader(f"🔎 Class Setup ({cohort})")
+    
+    # 1. First Dropdown: Select the Subject
+    # Pulling the subjects from your existing database structure
+    all_subjects = ["Maths", "Science", "English", "Art", "Computing", "Design", "Drama", "Geography", "History", "Hospitality", "Music", "Photography", "Spanish", "Sport"]
+    selected_subject = st.sidebar.selectbox("What subject are you teaching?", all_subjects, key="afl_sub")
     
     filtered_df = df_base.copy()
-    if selected_form: filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
-    if selected_math: filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
     
-    # Render the module!
+    # 2. Conditional Dropdowns: The "If Maths/Science" Logic
+    if selected_subject in ["Maths", "Science"]:
+        # Show Sets
+        available_sets = safe_unique(df_base, "Maths Set")
+        selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="afl_set")
+        
+        if selected_set != "All Sets":
+            filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
+            
+    else:
+        # Show Tutor Groups for everything else
+        available_forms = safe_unique(df_base, "Form Group")
+        selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="afl_form")
+        
+        if selected_form != "All Tutor Groups":
+            filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+            
+    # 3. Smart Option-Block Filtering (Year 10 Only)
+    # If they are teaching Year 10, remove kids who didn't pick this subject!
+    if cohort == "Year 10" and selected_subject in df_base.columns and selected_subject not in ["Maths", "Science", "English"]:
+        filtered_df = filtered_df[
+            filtered_df[selected_subject].notna() & 
+            (filtered_df[selected_subject].astype(str).str.strip() != "")
+        ]
+        
+    st.sidebar.divider()
+    st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
+
+    # 4. Render the module!
     from modules.academic_responses import render_academic_responses
     render_academic_responses(filtered_df, cohort)
