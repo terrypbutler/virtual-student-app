@@ -6,7 +6,6 @@ from PIL import Image
 from modules.photo_utils import display_student_photo
 
 def get_flexible_text(row, possible_names):
-    """Helper to safely extract data from the row."""
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
     for name in possible_names:
         clean_name = name.lower().strip()
@@ -18,11 +17,9 @@ def get_flexible_text(row, possible_names):
     return "Unknown"
 
 def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject):
-    """Centralized function to call Gemini with the Advanced Pedagogical Mega-Prompt."""
-    
+    """Handles batch generations (Whiteboards, Exit Tickets, Hands Up)"""
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
     
-    # 1. Build the ultra-rich profile list
     profiles = []
     for _, row in student_subset.iterrows():
         name = row.get("Full Name")
@@ -33,62 +30,44 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
         read_score = get_flexible_text(row, ["KS2 Read", "KS2 Reading", "SATs Reading"])
         suspensions = get_flexible_text(row, ["Suspension days", "Suspensions"])
         home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
-        
-        profiles.append(f"- {name} | Target: {grade} | SEN: {sen} | EAL: {eal} | KS2 Math: {math_score} | KS2 Read: {read_score} | Suspensions: {suspensions} | Home Context: {home_life}")
+        profiles.append(f"- {name} | Target: {grade} | SEN: {sen} | EAL: {eal} | KS2 Math: {math_score} | KS2 Read: {read_score} | Susp: {suspensions} | Home: {home_life}")
         
     profiles_text = "\n".join(profiles)
     
-    # 2. The Master Prompt
     prompt = f"""
     A trainee teacher is conducting a {subject} lesson for a class of {cohort} students (approximate age: {age_context}).
     The teacher has asked the class: "{question}"
-    
-    First, internally assess the cognitive demand and age-appropriateness of this question. If the trainee is asking a university-level question to 11-year-olds, the students should express intense confusion or give wildly inaccurate guesses.
     
     Here is the detailed data for the specific students answering:
     {profiles_text}
     
     {instructions}
     
-    CRITICAL PEDAGOGICAL CONSTRAINTS FOR YOUR GENERATION:
-    1. Ability Match: You MUST scale the vocabulary, accuracy, and depth of the answer to match their Target Grade and KS2/SATs scores. 
-    2. Deep Misconceptions: This is a training simulator. For students with lower grades or SEN, you MUST heavily inject realistic, {subject}-specific misconceptions, procedural errors, partial misunderstandings, or phonetic spelling mistakes. Do not just make them say "I don't know." Give them a wrong answer that makes logical sense to a struggling teenager.
-    3. Attitude & Randomness: Factor in their suspension data and home context. Randomly assign a "mood" (great day vs. bad day) to each student. A high-achiever having a bad day might give a lazy, clipped answer. A struggling student having a great day might try really hard but still get it wrong. Students with high suspensions might give defiant or off-topic answers.
-    4. Visual Presentation: If the instructions ask for a detailed or long answer (like an Exit Ticket), prepend the text with a bracketed description of how the work looks visually (e.g., [Heavily crossed out with doodles in the margin], [Immaculate bullet points], [Written entirely in capital letters]).
+    CRITICAL PEDAGOGICAL CONSTRAINTS:
+    1. Ability Match: Scale vocabulary, accuracy, and depth to their Target Grade and KS2/SATs scores. 
+    2. Deep Misconceptions: Inject realistic, {subject}-specific misconceptions or partial misunderstandings for lower grades.
+    3. Attitude: Factor in suspensions and home context to randomly assign a mood.
     
-    CRITICAL TECHNICAL RULES:
-    - If the answer requires mathematics, format it simply using standard keyboard symbols (like x^2) or Unicode (like x²). Do not use complex LaTeX.
-    - Return ONLY a valid JSON dictionary where the keys are the exact student names and the values are their answers. Do not include any other text.
+    CRITICAL: Format math using standard text (e.g., x² or x^2), NO LaTeX.
+    CRITICAL: Return ONLY a valid JSON dictionary where keys are exact student names and values are their answers.
     """
     
-    max_retries = 3
-    for attempt in range(max_retries):
+    for attempt in range(3):
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
             contents = [prompt]
-            if uploaded_file is not None:
-                contents.append(Image.open(uploaded_file))
+            if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
-            response = model.generate_content(
-                contents, 
-                generation_config={"response_mime_type": "application/json"}
-            )
-            
-            clean_text = response.text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-            
+            response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
+            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
         except Exception as e:
-            error_msg = str(e)
-            if "ResourceExhausted" in error_msg or "429" in error_msg:
-                if attempt < max_retries - 1:
-                    st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds... (Attempt {attempt + 1} of {max_retries})")
-                    time.sleep(20)
-                else:
-                    st.error("🚦 The AI is completely exhausted. Please wait a full 60 seconds before asking another question.")
-                    return {}
-            else:
-                st.error("Failed to fetch AI response. Please check your question and try again.")
+            if "429" in str(e) and attempt < 2:
+                st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
+                time.sleep(20)
+            elif attempt == 2:
+                st.error("🚦 AI exhausted. Please wait 60 seconds.")
                 return {}
+    return {}
 
 def render_academic_responses(df, cohort, subject="General"):
     st.subheader(f"🎓 AfL Simulator: {subject} Questioning")
@@ -100,7 +79,7 @@ def render_academic_responses(df, cohort, subject="General"):
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Present the Material")
-    teacher_question = st.text_area("Ask the class a question:")
+    teacher_question = st.text_area("Ask the class your opening question:")
     uploaded_file = st.file_uploader("Upload a resource (optional)", type=['png', 'jpg', 'jpeg'])
     
     if uploaded_file is not None:
@@ -113,13 +92,13 @@ def render_academic_responses(df, cohort, subject="General"):
         "📝 Mini-Whiteboards (Whole Class)", 
         "🚪 Exit Tickets (Detailed)", 
         "🙋 Hands Up (Volunteers)", 
-        "🎯 Cold Call (Targeted)"
+        "🎯 Cold Call (Interactive Probing)"
     ], horizontal=True, label_visibility="collapsed")
     
     st.markdown("---")
     
     if not teacher_question:
-        st.info("👆 Please type a question above to begin.")
+        st.info("👆 Please type an opening question above to begin.")
         return
 
     # --- MODE: MINI-WHITEBOARDS ---
@@ -131,7 +110,6 @@ def render_academic_responses(df, cohort, subject="General"):
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers:
-                    st.markdown("### Classroom Whiteboards")
                     num_cols = 5
                     for i in range(0, len(df), num_cols):
                         cols = st.columns(num_cols)
@@ -140,78 +118,117 @@ def render_academic_responses(df, cohort, subject="General"):
                                 name = row.get("Full Name")
                                 display_student_photo(name, cohort)
                                 st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
-                                
                                 ans = answers.get(name, "?")
-                                st.markdown(f"""
-                                    <div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; 
-                                                padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; 
-                                                align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'>
-                                        <span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span>
-                                    </div>
-                                """, unsafe_allow_html=True)
+                                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span></div>", unsafe_allow_html=True)
 
     # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
-        st.caption("Collects a detailed paragraph from a 'Targeted Marking Pile' of 8 students to check deep understanding.")
+        st.caption("Collects a detailed paragraph from a 'Targeted Marking Pile' of 8 students.")
         if st.button("Collect Exit Tickets", type="primary"):
-            with st.spinner("Students are writing their paragraphs..."):
+            with st.spinner("Students are writing..."):
                 target_df = df.sample(n=min(8, len(df))) 
-                instructions = "Generate a detailed, full-sentence explanation (2 to 4 sentences) for EACH student. You MUST include the bracketed visual formatting description at the start of every response."
+                instructions = "Generate a detailed, full-sentence explanation (2 to 4 sentences) for EACH student. Include bracketed visual formatting descriptions."
                 answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
                 
                 if answers: 
-                    st.markdown(f"### 📑 Teacher's Marking Pile ({len(target_df)} selected at random)")
                     for _, row in target_df.iterrows():
                         name = row.get("Full Name")
                         ans = answers.get(name, "No ticket submitted.")
                         with st.expander(f"🎫 {name}'s Ticket"):
                             col1, col2 = st.columns([1, 5])
-                            with col1:
-                                display_student_photo(name, cohort)
-                            with col2:
-                                st.write(ans)
+                            with col1: display_student_photo(name, cohort)
+                            with col2: st.write(ans)
 
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
         st.caption("Simulates 5 students volunteering to answer the question.")
         if st.button("See who raised their hand...", type="primary"):
-            with st.spinner("Looking around the room..."):
+            with st.spinner("Looking around..."):
                 volunteers_df = df.sample(n=min(5, len(df)))
-                instructions = "Generate a spoken, conversational answer for EACH of these volunteering students. Since they volunteered, they feel confident, but they may confidently share a complete misconception."
+                instructions = "Generate a spoken answer for EACH student. They volunteered, so they feel confident, but may share a confident misconception."
                 answers = fetch_ai_answers(teacher_question, volunteers_df, instructions, uploaded_file, cohort, subject)
                 
                 if answers:
-                    st.markdown("### 🖐️ Volunteers")
                     for _, row in volunteers_df.iterrows():
                         name = row.get("Full Name")
                         ans = answers.get(name, "...")
-                        
-                        st.markdown(f"""
-                            <div style='background-color: #f8f9fa; border-left: 5px solid #f1c40f; padding: 15px; margin-bottom: 10px; border-radius: 4px;'>
-                                <strong>{name} raises their hand:</strong> "{ans}"
-                            </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f"<div style='background-color: #f8f9fa; border-left: 5px solid #f1c40f; padding: 15px; margin-bottom: 10px; border-radius: 4px;'><strong>{name} raises their hand:</strong> \"{ans}\"</div>", unsafe_allow_html=True)
 
-    # --- MODE: COLD Call ---
-    elif mode == "🎯 Cold Call (Targeted)":
-        st.caption("Select a specific student and put them on the spot.")
+    # --- MODE: COLD CALL (INTERACTIVE PROBING) ---
+    elif mode == "🎯 Cold Call (Interactive Probing)":
+        st.caption("Put a student on the spot, listen to their answer, and ask follow-up questions to probe their understanding.")
         target_name = st.selectbox("Select student to Cold Call:", df["Full Name"].tolist())
         
-        if st.button(f"Ask {target_name}", type="primary"):
-            with st.spinner(f"Waiting for {target_name} to answer..."):
-                target_df = df[df["Full Name"] == target_name]
-                instructions = "Generate a spoken, conversational answer for this specific student. Because they were cold-called, they might hesitate, use filler words ('Umm'), or panic slightly depending on their confidence, mood, and ability."
-                answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
+        chat_key = f"probe_chat_{target_name}"
+        
+        # Initialize chat history if it doesn't exist
+        if chat_key not in st.session_state:
+            st.session_state[chat_key] = []
+            
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            display_student_photo(target_name, cohort)
+            if st.button("🔄 Reset Chat", use_container_width=True):
+                st.session_state[chat_key] = []
+                st.rerun()
                 
-                if answers:
-                    ans = answers.get(target_name, "...")
+        with col2:
+            # 1. THE OPENING QUESTION
+            if len(st.session_state[chat_key]) == 0:
+                if st.button(f"🗣️ Ask {target_name} the opening question", type="primary"):
+                    with st.spinner(f"Waiting for {target_name} to respond..."):
+                        target_df = df[df["Full Name"] == target_name]
+                        instructions = "Generate a spoken answer for this specific student based on their profile. Include hesitation or filler words ('Umm') if appropriate."
+                        
+                        # We use the batch function just for convenience, grabbing the single dictionary result
+                        answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
+                        
+                        if answers:
+                            student_reply = answers.get(target_name, "...")
+                            # Save the interaction to memory
+                            st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
+                            st.session_state[chat_key].append({"role": "student", "content": student_reply})
+                            st.rerun()
+                            
+            # 2. THE PROBING CONVERSATION
+            else:
+                # Render the chat history
+                for msg in st.session_state[chat_key]:
+                    if msg["role"] == "teacher":
+                        with st.chat_message("user"): st.write(msg["content"])
+                    else:
+                        with st.chat_message("assistant"): st.write(msg["content"])
+                        
+                # 3. THE FOLLOW-UP INPUT
+                follow_up = st.chat_input(f"Probe {target_name} deeper...")
+                if follow_up:
+                    st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
+                    with st.chat_message("user"): st.write(follow_up)
                     
-                    col1, col2 = st.columns([1, 4])
-                    with col1:
-                        display_student_photo(target_name, cohort)
-                    with col2:
-                        st.markdown(f"""
-                            <div style='background-color: #e8f4f8; border: 1px solid #bce8f1; padding: 20px; border-radius: 8px; font-size: 16px;'>
-                                🗣️ <strong>{target_name}:</strong> "{ans}"
-                            </div>
-                        """, unsafe_allow_html=True)
+                    with st.spinner(f"{target_name} is thinking..."):
+                        # We build a custom plain-text prompt for the ongoing chat so it remembers the context
+                        target_row = df[df["Full Name"] == target_name].iloc[0]
+                        target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
+                        target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
+                        
+                        # Build the transcript so the AI knows what has been said
+                        transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
+                        
+                        chat_prompt = f"""
+                        You are roleplaying as {target_name}, a {cohort} student. Target Grade: {target_grade}, SEN: {target_sen}.
+                        The subject is {subject}. 
+                        
+                        Here is the conversation so far:
+                        {transcript}
+                        
+                        Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
+                        If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused.
+                        """
+                        
+                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        try:
+                            reply = model.generate_content(chat_prompt)
+                            st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                            st.rerun()
+                        except Exception as e:
+                            st.error("Failed to generate response. You may have hit the speed limit.")
