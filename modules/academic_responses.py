@@ -16,8 +16,47 @@ def get_flexible_text(row, possible_names):
                 return val
     return "Unknown"
 
+def create_printable_worksheet(question, answers, df, subject, cohort):
+    """Generates a clean, A4-ready HTML worksheet for trainees to practice physical marking."""
+    html = [
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Marking Practice</title>",
+        "<style>",
+        "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #222; line-height: 1.5; }",
+        "@media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .student-box { page-break-inside: avoid; } }",
+        ".header { text-align: center; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 30px; }",
+        ".question-box { background: #f8f9fa; padding: 15px; border-left: 5px solid #3498DB; margin-bottom: 30px; font-size: 16px; }",
+        ".student-box { border: 2px solid #ddd; padding: 20px; margin-bottom: 25px; border-radius: 8px; }",
+        ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
+        ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
+        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; }",
+        ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
+        ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
+        "</style></head><body>",
+        f"<div class='header'><h2>ITT Marking Practice: {cohort} {subject}</h2></div>",
+        f"<div class='question-box'><strong>Teacher's Prompt / Exit Ticket Question:</strong><br><br>{question}</div>"
+    ]
+
+    for _, row in df.iterrows():
+        name = row.get("Full Name", "Unknown")
+        grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
+        sen = get_flexible_text(row, ["SEN Status", "SEND Status"])
+        ans = answers.get(name, "No response submitted.")
+
+        profile_text = f"Target: {grade}"
+        if sen and sen.upper() not in ["N/A", "NONE", "NO", "N", ""]:
+            profile_text += f" | SEN: {sen}"
+
+        html.append(f"<div class='student-box'>")
+        html.append(f"<div class='student-name'>{name}</div>")
+        html.append(f"<div class='student-profile'>Context for Trainee: {profile_text}</div>")
+        html.append(f"<div class='student-answer'>{ans}</div>")
+        html.append(f"<div class='marking-area'><span class='marking-title'>Trainee Feedback / Next Steps:</span></div>")
+        html.append(f"</div>")
+
+    html.append("</body></html>")
+    return "\n".join(html)
+
 def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject):
-    """Handles batch generations (Whiteboards, Exit Tickets, Hands Up)"""
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
     
     profiles = []
@@ -28,9 +67,9 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
         eal = get_flexible_text(row, ["EAL", "EAL Status"])
         math_score = get_flexible_text(row, ["KS2 Maths", "KS2 Math", "SATs Maths"])
         read_score = get_flexible_text(row, ["KS2 Read", "KS2 Reading", "SATs Reading"])
-        suspensions = get_flexible_text(row, ["Suspension days", "Suspensions"])
-        home_life = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
-        profiles.append(f"- {name} | Target: {grade} | SEN: {sen} | EAL: {eal} | KS2 Math: {math_score} | KS2 Read: {read_score} | Susp: {suspensions} | Home: {home_life}")
+        susp = get_flexible_text(row, ["Suspension days", "Suspensions"])
+        home = get_flexible_text(row, ["Home Life & Interests", "Home Life"])
+        profiles.append(f"- {name} | Target: {grade} | SEN: {sen} | EAL: {eal} | KS2 Math: {math_score} | KS2 Read: {read_score} | Susp: {susp} | Home: {home}")
         
     profiles_text = "\n".join(profiles)
     
@@ -131,6 +170,23 @@ def render_academic_responses(df, cohort, subject="General"):
                 answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
                 
                 if answers: 
+                    st.success("✅ Exit tickets collected!")
+                    
+                    # --- NEW: The Download Button ---
+                    html_worksheet = create_printable_worksheet(teacher_question, answers, target_df, subject, cohort)
+                    st.download_button(
+                        label="🖨️ Download as Printable Worksheet",
+                        data=html_worksheet,
+                        file_name=f"{cohort}_{subject}_Marking_Exercise.html",
+                        mime="text/html",
+                        help="Downloads a perfectly formatted file. Open it in your browser and press Ctrl+P to print!",
+                        type="secondary",
+                        use_container_width=True
+                    )
+                    st.markdown("---")
+                    
+                    # Still display them on screen as a preview
+                    st.markdown(f"### 📑 On-Screen Preview ({len(target_df)} selected at random)")
                     for _, row in target_df.iterrows():
                         name = row.get("Full Name")
                         ans = answers.get(name, "No ticket submitted.")
@@ -161,7 +217,6 @@ def render_academic_responses(df, cohort, subject="General"):
         
         chat_key = f"probe_chat_{target_name}"
         
-        # Initialize chat history if it doesn't exist
         if chat_key not in st.session_state:
             st.session_state[chat_key] = []
             
@@ -173,45 +228,34 @@ def render_academic_responses(df, cohort, subject="General"):
                 st.rerun()
                 
         with col2:
-            # 1. THE OPENING QUESTION
             if len(st.session_state[chat_key]) == 0:
                 if st.button(f"🗣️ Ask {target_name} the opening question", type="primary"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer for this specific student based on their profile. Include hesitation or filler words ('Umm') if appropriate."
-                        
-                        # We use the batch function just for convenience, grabbing the single dictionary result
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
                         
                         if answers:
                             student_reply = answers.get(target_name, "...")
-                            # Save the interaction to memory
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             st.rerun()
-                            
-            # 2. THE PROBING CONVERSATION
             else:
-                # Render the chat history
                 for msg in st.session_state[chat_key]:
                     if msg["role"] == "teacher":
                         with st.chat_message("user"): st.write(msg["content"])
                     else:
                         with st.chat_message("assistant"): st.write(msg["content"])
                         
-                # 3. THE FOLLOW-UP INPUT
                 follow_up = st.chat_input(f"Probe {target_name} deeper...")
                 if follow_up:
                     st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
                     with st.chat_message("user"): st.write(follow_up)
                     
                     with st.spinner(f"{target_name} is thinking..."):
-                        # We build a custom plain-text prompt for the ongoing chat so it remembers the context
                         target_row = df[df["Full Name"] == target_name].iloc[0]
                         target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                         target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
-                        
-                        # Build the transcript so the AI knows what has been said
                         transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
                         
                         chat_prompt = f"""
