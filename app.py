@@ -271,4 +271,4 @@ elif page == "Academic AfL":
 
     # 4. Render the module!
     from modules.academic_responses import render_academic_responses
-    render_academic_responses(filtered_df, cohort)
+    render_academic_responses(filtered_df, cohort, selected_subject)
