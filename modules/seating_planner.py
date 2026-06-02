@@ -31,10 +31,39 @@ def get_student_dots(student_name, df):
     except:
         return ""
 
+def render_seat_ui(seat_key, current_val, next_student, cohort, df):
+    """Helper to consistently render the visual seat box."""
+    st.markdown("<div style='border: 1px solid #ddd; border-radius: 8px; padding: 5px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: white; margin-bottom: 10px;'>", unsafe_allow_html=True)
+    
+    if current_val == "Empty":
+        st.markdown("<div style='height: 80px; display: flex; align-items: center; justify-content: center; color: #ccc;'><em>Empty</em></div>", unsafe_allow_html=True)
+        if st.button("➕ Place", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
+            if next_student:
+                st.session_state.seats[seat_key] = next_student
+                st.rerun()
+    else:
+        display_student_photo(current_val, cohort)
+        
+        dots = get_student_dots(current_val, df)
+        if dots:
+            st.markdown(f"<div style='text-align: center; font-size: 12px; margin: 2px 0;'>{dots}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='margin: 2px 0;'>&nbsp;</div>", unsafe_allow_html=True)
+            
+        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 5px;'>{current_val}</div>", unsafe_allow_html=True)
+        
+        if st.button("❌", key=f"rm_{seat_key}", use_container_width=True):
+            st.session_state.seats[seat_key] = "Empty"
+            st.rerun()
+            
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_seating_plan(df, cohort):
     st.subheader("⚡ Visual Classroom Planner")
     
-    rows, cols = 5, 6
+    # We standardize on 32 total seats (4x8 rows OR 8 tables of 4)
+    TOTAL_SEATS = 32
     if 'seats' not in st.session_state: st.session_state.seats = {}
     
     # 1. Determine who is seated and who is unassigned
@@ -63,55 +92,71 @@ def render_seating_plan(df, cohort):
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col2:
-        st.markdown("### 🪑 Classroom Grid")
+        st.markdown("### 🪑 Classroom Layout")
         
-        # Auto-Fill & Clear Tools
-        tools_c1, tools_c2, tools_c3 = st.columns([1, 1, 2])
+        # Tools & Layout Selector
+        tools_c1, tools_c2, tools_c3 = st.columns([1.5, 1, 1])
         with tools_c1:
-            if st.button("🪄 Auto-Fill", use_container_width=True):
-                available_seats = [f"seat_{r}_{c}" for r in range(rows) for c in range(cols) if st.session_state.seats.get(f"seat_{r}_{c}", "Empty") == "Empty"]
+            layout_choice = st.radio("Seat Grouping:", ["Rows (4x8)", "Groups (8 Tables)"], horizontal=True, label_visibility="collapsed")
+        with tools_c2:
+            if st.button("🪄 Auto-Fill Room", use_container_width=True):
+                available_seats = [f"seat_{i}" for i in range(TOTAL_SEATS) if st.session_state.seats.get(f"seat_{i}", "Empty") == "Empty"]
                 random.shuffle(unassigned_students)
                 for i, student in enumerate(unassigned_students):
                     if i < len(available_seats):
                         st.session_state.seats[available_seats[i]] = student
                 st.rerun()
-        with tools_c2:
+        with tools_c3:
             if st.button("🗑️ Clear Room", use_container_width=True):
                 st.session_state.seats = {}
                 st.rerun()
 
         st.markdown("---")
         
+        # --- FRONT OF CLASS BANNER ---
+        st.markdown("""
+        <div style='text-align: center; background-color: #2C3E50; color: white; padding: 8px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; letter-spacing: 3px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);'>
+            👨‍🏫 FRONT OF CLASSROOM (WHITEBOARD) 👩‍🏫
+        </div>
+        """, unsafe_allow_html=True)
+        
         # --- THE VISUAL GRID ---
-        for r in range(rows):
-            row_cols = st.columns(cols)
-            for c in range(cols):
-                seat_key = f"seat_{r}_{c}"
-                current_val = st.session_state.seats.get(seat_key, "Empty")
-                
-                with row_cols[c]:
-                    # Create a distinct visual box for every seat
-                    st.markdown("<div style='border: 1px solid #ddd; border-radius: 8px; padding: 5px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: white;'>", unsafe_allow_html=True)
+        if layout_choice == "Rows (4x8)":
+            for r in range(4):
+                row_cols = st.columns(8)
+                for c in range(8):
+                    seat_idx = (r * 8) + c
+                    seat_key = f"seat_{seat_idx}"
+                    current_val = st.session_state.seats.get(seat_key, "Empty")
                     
-                    if current_val == "Empty":
-                        # Render Empty Seat Button
-                        st.markdown("<div style='height: 100px; display: flex; align-items: center; justify-content: center; color: #ccc;'><em>Empty Seat</em></div>", unsafe_allow_html=True)
-                        if st.button("➕ Place", key=seat_key, use_container_width=True, type="secondary"):
-                            if next_student:
-                                st.session_state.seats[seat_key] = next_student
-                                st.rerun()
-                    else:
-                        # Render Occupied Seat (Photo + Dots + Name + Remove Button)
-                        display_student_photo(current_val, cohort)
+                    with row_cols[c]:
+                        render_seat_ui(seat_key, current_val, next_student, cohort, df)
                         
-                        dots = get_student_dots(current_val, df)
-                        if dots:
-                            st.markdown(f"<div style='text-align: center; font-size: 12px; margin: 2px 0;'>{dots}</div>", unsafe_allow_html=True)
+        else:
+            # Groups (8 Tables of 4)
+            # We create 2 rows of 4 tables.
+            for grp_row in range(2):
+                table_cols = st.columns(4)
+                for grp_col in range(4):
+                    table_idx = (grp_row * 4) + grp_col
+                    with table_cols[grp_col]:
+                        st.markdown(f"<div style='text-align: center; padding: 5px; background-color: #ecf0f1; border-radius: 5px 5px 0 0; font-weight: bold; border: 1px solid #bdc3c7; border-bottom: none;'>Table {table_idx + 1}</div>", unsafe_allow_html=True)
                         
-                        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 5px;'>{current_val}</div>", unsafe_allow_html=True)
-                        
-                        if st.button("❌", key=f"remove_{r}_{c}", use_container_width=True):
-                            st.session_state.seats[seat_key] = "Empty"
-                            st.rerun()
+                        # Create a stylized "Table" container
+                        with st.container():
+                            st.markdown("<div style='background-color: #fdfdfd; border: 1px solid #bdc3c7; border-radius: 0 0 5px 5px; padding: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
                             
-                    st.markdown("</div>", unsafe_allow_html=True)
+                            seat_start = table_idx * 4
+                            
+                            # Top two seats at the table
+                            t1, t2 = st.columns(2)
+                            with t1: render_seat_ui(f"seat_{seat_start}", st.session_state.seats.get(f"seat_{seat_start}", "Empty"), next_student, cohort, df)
+                            with t2: render_seat_ui(f"seat_{seat_start+1}", st.session_state.seats.get(f"seat_{seat_start+1}", "Empty"), next_student, cohort, df)
+                            
+                            # Bottom two seats at the table
+                            b1, b2 = st.columns(2)
+                            with b1: render_seat_ui(f"seat_{seat_start+2}", st.session_state.seats.get(f"seat_{seat_start+2}", "Empty"), next_student, cohort, df)
+                            with b2: render_seat_ui(f"seat_{seat_start+3}", st.session_state.seats.get(f"seat_{seat_start+3}", "Empty"), next_student, cohort, df)
+                            
+                            st.markdown("</div>", unsafe_allow_html=True)
+                            
