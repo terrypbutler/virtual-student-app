@@ -115,7 +115,6 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     - If you use LaTeX, you MUST double-escape the backslashes (e.g., `\\\\frac`, `\\\\sqrt`) so the JSON parser does not crash.
     """
     
-    # Keeping the bulk generator on Flash for speed
     for attempt in range(3):
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
@@ -166,25 +165,22 @@ def render_academic_responses(df, cohort, subject="General"):
         st.info("👆 Please type an opening question above to begin.")
         return
 
-   # --- MODE: MINI-WHITEBOARDS ---
+    # --- MODE: MINI-WHITEBOARDS ---
     if mode == "📝 Mini-Whiteboards (Whole Class)":
         st.caption("Scans the whole room for quick, short-form answers.")
         if st.button("Show All Mini-Whiteboards", type="primary"):
             
-            # 1. The AI thinks while the students "write"
             with st.spinner("Students are scribbling on their boards..."):
-                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief. If child would not know write IDK, ? or similar"
+                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
             if answers:
-                # 2. The Dramatic Classroom Countdown!
                 reveal_text = st.empty()
                 for word in ["Three...", "Two...", "One...", "Show me!"]:
                     reveal_text.markdown(f"<h2 style='text-align: center; color: #E67E22;'>{word}</h2>", unsafe_allow_html=True)
                     time.sleep(0.7)
-                reveal_text.empty() # Clears the text right as the boards flip over
+                reveal_text.empty() 
                 
-                # 3. Draw the whiteboards
                 num_cols = 5
                 for i in range(0, len(df), num_cols):
                     cols = st.columns(num_cols)
@@ -237,10 +233,9 @@ def render_academic_responses(df, cohort, subject="General"):
         if "hu_volunteers" not in st.session_state: st.session_state.hu_volunteers = []
         if "hu_selected" not in st.session_state: st.session_state.hu_selected = None
 
-col1, col2 = st.columns([1, 4])
+        col1, col2 = st.columns([1, 4])
         with col1:
             if st.button("🙋 Ask for Volunteers", type="primary", use_container_width=True):
-                # Now picks between 3 and 10 students
                 num_vols = random.randint(3, min(10, len(df)))
                 vol_df = df.sample(n=num_vols)
                 st.session_state.hu_volunteers = vol_df["Full Name"].tolist()
@@ -257,7 +252,6 @@ col1, col2 = st.columns([1, 4])
             st.markdown("### 🖐️ Look who raised their hand:")
             vols = st.session_state.hu_volunteers
             
-            # Display pictures neatly in rows of 5 so they don't get squished!
             for i in range(0, len(vols), 5):
                 cols = st.columns(5)
                 for idx, vol_name in enumerate(vols[i : i + 5]):
@@ -266,18 +260,6 @@ col1, col2 = st.columns([1, 4])
                         if st.button(f"Call on {vol_name}", key=f"btn_{vol_name}", use_container_width=True):
                             st.session_state.hu_selected = vol_name
                             st.rerun()
-
-        st.markdown("---")
-
-        if st.session_state.hu_volunteers and not st.session_state.hu_selected:
-            st.markdown("### 🖐️ Look who raised their hand:")
-            cols = st.columns(len(st.session_state.hu_volunteers))
-            for idx, vol_name in enumerate(st.session_state.hu_volunteers):
-                with cols[idx]:
-                    display_student_photo(vol_name, cohort)
-                    if st.button(f"Call on {vol_name}", key=f"btn_{vol_name}", use_container_width=True):
-                        st.session_state.hu_selected = vol_name
-                        st.rerun()
 
         elif st.session_state.hu_selected:
             target_name = st.session_state.hu_selected
@@ -316,8 +298,6 @@ col1, col2 = st.columns([1, 4])
                     follow_up = st.chat_input(f"Probe {target_name} deeper...")
                     if follow_up:
                         st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                        
-                        # Show the user's message instantly in the UI
                         with st.chat_message("user"): st.markdown(follow_up)
                         
                         with st.spinner(f"{target_name} is thinking..."):
@@ -338,7 +318,6 @@ col1, col2 = st.columns([1, 4])
                             You may naturally address the teacher as {teacher_name}. Do not include commentary. Use new lines if demonstrating steps.
                             """
                             
-                            # Upgraded to Pro Model for 1-on-1 Chat!
                             model = genai.GenerativeModel('gemini-2.5-pro')
                             try:
                                 reply = model.generate_content(chat_prompt)
@@ -386,8 +365,6 @@ col1, col2 = st.columns([1, 4])
                 follow_up = st.chat_input(f"Probe {target_name} deeper...")
                 if follow_up:
                     st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                    
-                    # Show the user's message instantly in the UI
                     with st.chat_message("user"): st.markdown(follow_up)
                     
                     with st.spinner(f"{target_name} is thinking..."):
@@ -407,7 +384,6 @@ col1, col2 = st.columns([1, 4])
                         You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
                         """
                         
-                        # Upgraded to Pro Model for 1-on-1 Chat!
                         model = genai.GenerativeModel('gemini-2.5-pro')
                         try:
                             reply = model.generate_content(chat_prompt)
