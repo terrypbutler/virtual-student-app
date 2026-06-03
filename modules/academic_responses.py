@@ -115,6 +115,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     - If you use LaTeX, you MUST double-escape the backslashes (e.g., `\\\\frac`, `\\\\sqrt`) so the JSON parser does not crash.
     """
     
+    # Keeping the bulk generator on Flash for speed
     for attempt in range(3):
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
@@ -131,6 +132,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
                 st.error("🚦 AI exhausted. Please wait 60 seconds.")
                 return {}
     return {}
+
 def render_academic_responses(df, cohort, subject="General"):
     st.subheader(f"🎓 AfL Simulator: {subject} Questioning")
     
@@ -287,7 +289,9 @@ def render_academic_responses(df, cohort, subject="General"):
                     follow_up = st.chat_input(f"Probe {target_name} deeper...")
                     if follow_up:
                         st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                        st.rerun() 
+                        
+                        # Show the user's message instantly in the UI
+                        with st.chat_message("user"): st.markdown(follow_up)
                         
                         with st.spinner(f"{target_name} is thinking..."):
                             target_row = df[df["Full Name"] == target_name].iloc[0]
@@ -307,6 +311,7 @@ def render_academic_responses(df, cohort, subject="General"):
                             You may naturally address the teacher as {teacher_name}. Do not include commentary. Use new lines if demonstrating steps.
                             """
                             
+                            # Upgraded to Pro Model for 1-on-1 Chat!
                             model = genai.GenerativeModel('gemini-2.5-pro')
                             try:
                                 reply = model.generate_content(chat_prompt)
@@ -354,7 +359,9 @@ def render_academic_responses(df, cohort, subject="General"):
                 follow_up = st.chat_input(f"Probe {target_name} deeper...")
                 if follow_up:
                     st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                    st.rerun()
+                    
+                    # Show the user's message instantly in the UI
+                    with st.chat_message("user"): st.markdown(follow_up)
                     
                     with st.spinner(f"{target_name} is thinking..."):
                         target_row = df[df["Full Name"] == target_name].iloc[0]
@@ -373,6 +380,7 @@ def render_academic_responses(df, cohort, subject="General"):
                         You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
                         """
                         
+                        # Upgraded to Pro Model for 1-on-1 Chat!
                         model = genai.GenerativeModel('gemini-2.5-pro')
                         try:
                             reply = model.generate_content(chat_prompt)
