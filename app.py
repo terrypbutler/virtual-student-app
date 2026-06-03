@@ -228,12 +228,25 @@ elif page == "Seating Plan":
 elif page == "Simulator":
     st.title("🎭 ITT Roleplay Simulator")
 
-    # Use the exact same filter setup you use on the seating plan to narrow down the student list!
+    # 1. Select the base data
     cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
     df_base = df_y7 if cohort == "Year 7" else df_y10
 
+    # 2. Build the sidebar filters
+    st.sidebar.subheader(f"🔎 Filters ({cohort})")
+    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df_base, "Form Group"), key="sim_form")
+    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df_base, "Maths Set"), key="sim_math")
+
+    # 3. Create the filtered_df
+    filtered_df = df_base.copy()
+    if selected_form: 
+        filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
+    if selected_math: 
+        filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
+
+    # 4. Pass the FILTERED list to the simulator
     from modules.student_simulator import render_simulator
-    render_simulator(df_base, cohort)
+    render_simulator(filtered_df, cohort)
 
 elif page == "Academic AfL":
     st.title("🧠 Academic Response Simulator")
