@@ -99,7 +99,7 @@ def render_simulator(df, cohort):
             # Call the AI
             with st.spinner(f"{selected_student} is thinking..."):
                 try:
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    model = genai.GenerativeModel('gemini-2.5-pro')
                     response = model.generate_content(
                         system_prompt + f"\n\nTrainee Teacher says: {teacher_input}"
                     )
