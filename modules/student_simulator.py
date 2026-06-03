@@ -75,10 +75,13 @@ def render_simulator(df, cohort):
         teacher_input = st.chat_input(f"Say something to {selected_student}...")
         
         if teacher_input:
-            # Show the teacher's message
+            # Show the teacher's message instantly
             st.session_state[chat_key].append({"role": "user", "content": teacher_input})
             with st.chat_message("user"):
                 st.write(teacher_input)
+
+            # Build the continuous transcript so the AI remembers the conversation!
+            transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
             # Build the invisible System Prompt
             system_prompt = f"""
@@ -91,20 +94,23 @@ def render_simulator(df, cohort):
             - Suspensions: {suspensions}
             
             The current scenario is: {scenario}.
-            A trainee teacher is speaking to you. Respond exactly how a student with your profile would respond. 
+            
+            Here is the conversation transcript so far:
+            {transcript}
+            
+            Respond to the teacher's last statement as {selected_student}. 
+            Respond exactly how a student with your profile would respond. 
             Do NOT break character. Do NOT be overly polite if your profile suggests behavior issues.
             Keep your response short (1 to 3 sentences maximum) as a real teenager would.
             """
 
-            # Call the AI
+            # Call the AI (Using the Pro model for deep emotional/behavioral nuance)
             with st.spinner(f"{selected_student} is thinking..."):
                 try:
                     model = genai.GenerativeModel('gemini-2.5-pro')
-                    response = model.generate_content(
-                        system_prompt + f"\n\nTrainee Teacher says: {teacher_input}"
-                    )
+                    response = model.generate_content(system_prompt)
                     
-                    # Show the student's response
+                    # Save and show the student's response
                     st.session_state[chat_key].append({"role": "assistant", "content": response.text})
                     with st.chat_message("assistant"):
                         st.write(response.text)
