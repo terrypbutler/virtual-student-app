@@ -307,7 +307,7 @@ def render_academic_responses(df, cohort, subject="General"):
                             You may naturally address the teacher as {teacher_name}. Do not include commentary. Use new lines if demonstrating steps.
                             """
                             
-                            model = genai.GenerativeModel('gemini-2.5-flash')
+                            model = genai.GenerativeModel('gemini-2.5-pro')
                             try:
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
@@ -373,7 +373,7 @@ def render_academic_responses(df, cohort, subject="General"):
                         You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
                         """
                         
-                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        model = genai.GenerativeModel('gemini-2.5-pro')
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
