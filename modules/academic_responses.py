@@ -20,6 +20,11 @@ def get_flexible_text(row, possible_names):
 def create_printable_worksheet(question, answers, df, subject, cohort):
     html = [
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Marking Practice</title>",
+        
+        # --- NEW: The MathJax Engine! This makes the printed worksheet render beautiful LaTeX math ---
+        "<script src='https://polyfill.io/v3/polyfill.min.js?features=es6'></script>",
+        "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
+        
         "<style>",
         "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #222; line-height: 1.5; }",
         "@media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .student-box { page-break-inside: avoid; } }",
@@ -32,7 +37,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         ".student-box { border: 2px solid #ddd; padding: 20px; margin-bottom: 25px; border-radius: 8px; }",
         ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
         ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
-        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; white-space: pre-wrap; }",
+        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; }",
         ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
         ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
         "</style></head><body>",
@@ -57,7 +62,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
         sen = get_flexible_text(row, ["SEN Status", "SEND Status"])
         
-        # Ensure we pull the text safely and convert newlines to HTML breaks
+        # Ensure new lines are converted to HTML breaks for the printed page
         raw_ans = answers.get(name, "No response submitted.")
         html_ans = str(raw_ans).replace("\n", "<br>")
 
@@ -105,10 +110,12 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     1. Ability Match: Scale vocabulary, accuracy, and depth to their Target Grade and KS2/SATs scores. 
     2. Deep Misconceptions: Inject realistic, {subject}-specific misconceptions or partial misunderstandings for lower grades.
     3. Attitude: Factor in suspensions and home context to randomly assign a mood.
-    4. Layout formatting: If the student's answer involves multiple steps of calculation or logic, you MUST put each step on a new line using a newline character (\\n).
+    4. Math Formatting: Make maths look like real maths. DO NOT use raw carets (like r^2). You MUST use Unicode superscripts (e.g., r², x³, y₁) and symbols (π, √, ÷, ×, ±). For complex equations, use LaTeX wrapped in single `$` (e.g., `$x = \\frac{{1}}{{2}}$`).
+    5. Layout: If the answer involves multiple steps of calculation, you MUST put each step on a new line using a newline character (\\n).
     
-    CRITICAL: Format math using standard text (e.g., x² or x^2), NO LaTeX.
-    CRITICAL: Return ONLY a valid JSON dictionary where keys are exact student names and values are their answers.
+    CRITICAL TECHNICAL RULES:
+    - Return ONLY a valid JSON dictionary where keys are exact student names and values are their answers.
+    - If you use LaTeX, you MUST double-escape the backslashes (e.g., `\\\\frac`, `\\\\sqrt`) so the JSON parser does not crash.
     """
     
     for attempt in range(3):
@@ -165,7 +172,7 @@ def render_academic_responses(df, cohort, subject="General"):
         st.caption("Scans the whole room for quick, short-form answers.")
         if st.button("Show All Mini-Whiteboards", type="primary"):
             with st.spinner("Students are writing..."):
-                instructions = "Write exactly what the student would scribble on a whiteboard (max 8 words). DO NOT include commentary. Use new lines for math steps."
+                instructions = "Write exactly what the student would scribble on a whiteboard (max 10 words). DO NOT include commentary. Use new lines for math steps."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers:
@@ -179,9 +186,9 @@ def render_academic_responses(df, cohort, subject="General"):
                                 st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                                 
                                 raw_ans = answers.get(name, "?")
+                                # Replace newlines with HTML breaks for the custom div
                                 html_ans = str(raw_ans).replace("\n", "<br>")
-                                
-                                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
 
     # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
@@ -208,12 +215,14 @@ def render_academic_responses(df, cohort, subject="General"):
                     for _, row in df.iterrows():
                         name = row.get("Full Name")
                         raw_ans = answers.get(name, "No ticket submitted.")
-                        html_ans = str(raw_ans).replace("\n", "<br>")
+                        
+                        # Replace newlines with double newlines so Streamlit Markdown perfectly renders the line breaks
+                        st_ans = str(raw_ans).replace("\n", "\n\n")
                         
                         with st.expander(f"🎫 {name}'s Ticket"):
                             col1, col2 = st.columns([1, 5])
                             with col1: display_student_photo(name, cohort)
-                            with col2: st.markdown(html_ans, unsafe_allow_html=True)
+                            with col2: st.markdown(st_ans) # Native markdown handles LaTeX beautifully!
 
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
@@ -275,16 +284,18 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
+                        # Format for line breaks
+                        msg_text = str(msg["content"]).replace("\n", "\n\n")
                         if msg["role"] == "teacher":
-                            with st.chat_message("user"): st.write(msg["content"])
+                            with st.chat_message("user"): st.markdown(msg_text)
                         else:
-                            with st.chat_message("assistant"): st.write(msg["content"])
+                            with st.chat_message("assistant"): st.markdown(msg_text)
 
                     follow_up = st.chat_input(f"Probe {target_name} deeper...")
                     if follow_up:
                         st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                        with st.chat_message("user"): st.write(follow_up)
-
+                        st.rerun() # Refresh to show the user's message, AI will respond below
+                        
                         with st.spinner(f"{target_name} is thinking..."):
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
@@ -340,15 +351,16 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.rerun()
             else:
                 for msg in st.session_state[chat_key]:
+                    msg_text = str(msg["content"]).replace("\n", "\n\n")
                     if msg["role"] == "teacher":
-                        with st.chat_message("user"): st.write(msg["content"])
+                        with st.chat_message("user"): st.markdown(msg_text)
                     else:
-                        with st.chat_message("assistant"): st.write(msg["content"])
+                        with st.chat_message("assistant"): st.markdown(msg_text)
                         
                 follow_up = st.chat_input(f"Probe {target_name} deeper...")
                 if follow_up:
                     st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                    with st.chat_message("user"): st.write(follow_up)
+                    st.rerun()
                     
                     with st.spinner(f"{target_name} is thinking..."):
                         target_row = df[df["Full Name"] == target_name].iloc[0]
