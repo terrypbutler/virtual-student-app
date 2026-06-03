@@ -19,6 +19,8 @@ YEAR_10_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEty
 df_y7 = load_data(YEAR_7_URL)
 df_y10 = load_data(YEAR_10_URL)
 
+st.write(df_y7.columns.tolist())
+
 st.sidebar.title("🎓 Butler Academy")
 
 page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL"])
