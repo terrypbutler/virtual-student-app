@@ -267,6 +267,8 @@ elif page == "Academic AfL":
         filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
         
     st.sidebar.divider()
+    
+    # THIS is the line that was cut off!
     st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
 
     # 4. Render the module!
