@@ -171,7 +171,7 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Show All Mini-Whiteboards", type="primary"):
             
             with st.spinner("Students are scribbling on their boards..."):
-                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief."
+                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief. If a child does not know write IDK. ? or similar. Don not use the teachers name."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
             if answers:
