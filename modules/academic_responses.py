@@ -20,11 +20,8 @@ def get_flexible_text(row, possible_names):
 def create_printable_worksheet(question, answers, df, subject, cohort):
     html = [
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Marking Practice</title>",
-        
-        # --- NEW: The MathJax Engine! This makes the printed worksheet render beautiful LaTeX math ---
         "<script src='https://polyfill.io/v3/polyfill.min.js?features=es6'></script>",
         "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
-        
         "<style>",
         "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #222; line-height: 1.5; }",
         "@media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .student-box { page-break-inside: avoid; } }",
@@ -62,7 +59,6 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
         sen = get_flexible_text(row, ["SEN Status", "SEND Status"])
         
-        # Ensure new lines are converted to HTML breaks for the printed page
         raw_ans = answers.get(name, "No response submitted.")
         html_ans = str(raw_ans).replace("\n", "<br>")
 
@@ -80,7 +76,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
     html.append("</body></html>")
     return "\n".join(html)
 
-def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject):
+def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject, teacher_name):
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
     
     profiles = []
@@ -98,7 +94,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     profiles_text = "\n".join(profiles)
     
     prompt = f"""
-    A trainee teacher is conducting a {subject} lesson for a class of {cohort} students (approximate age: {age_context}).
+    A trainee teacher (addressed as '{teacher_name}') is conducting a {subject} lesson for a class of {cohort} students (approximate age: {age_context}).
     The teacher has asked the class: "{question}"
     
     Here is the detailed data for the specific students answering:
@@ -110,8 +106,9 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     1. Ability Match: Scale vocabulary, accuracy, and depth to their Target Grade and KS2/SATs scores. 
     2. Deep Misconceptions: Inject realistic, {subject}-specific misconceptions or partial misunderstandings for lower grades.
     3. Attitude: Factor in suspensions and home context to randomly assign a mood.
-    4. Math Formatting: Make maths look like real maths. DO NOT use raw carets (like r^2). You MUST use Unicode superscripts (e.g., r², x³, y₁) and symbols (π, √, ÷, ×, ±). For complex equations, use LaTeX wrapped in single `$` (e.g., `$x = \\frac{{1}}{{2}}$`).
-    5. Layout: If the answer involves multiple steps of calculation, you MUST put each step on a new line using a newline character (\\n).
+    4. Teacher Address: The students should occasionally use the teacher's name/title ('{teacher_name}') naturally in their responses (e.g., 'I think it's 4, {teacher_name}').
+    5. Math Formatting: Make maths look like real maths. DO NOT use raw carets (like r^2). You MUST use Unicode superscripts (e.g., r², x³, y₁) and symbols (π, √, ÷, ×, ±). For complex equations, use LaTeX wrapped in single `$` (e.g., `$x = \\frac{{1}}{{2}}$`).
+    6. Layout: If the answer involves multiple steps of calculation, you MUST put each step on a new line using a newline character (\\n).
     
     CRITICAL TECHNICAL RULES:
     - Return ONLY a valid JSON dictionary where keys are exact student names and values are their answers.
@@ -125,7 +122,8 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
+            return json.loads(response.text.replace("```json", "").replace("
+```", "").strip())
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -145,6 +143,7 @@ def render_academic_responses(df, cohort, subject="General"):
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Present the Material")
+    teacher_name = st.text_input("Your Title/Name (e.g., Mr. Smith, Miss, Sir):", value="Sir")
     teacher_question = st.text_area("Ask the class your opening question:")
     uploaded_file = st.file_uploader("Upload a resource (optional)", type=['png', 'jpg', 'jpeg'])
     
@@ -173,7 +172,7 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Show All Mini-Whiteboards", type="primary"):
             with st.spinner("Students are writing..."):
                 instructions = "Write exactly what the student would scribble on a whiteboard (max 10 words). DO NOT include commentary. Use new lines for math steps."
-                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
+                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
                 if answers:
                     num_cols = 5
@@ -186,7 +185,6 @@ def render_academic_responses(df, cohort, subject="General"):
                                 st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                                 
                                 raw_ans = answers.get(name, "?")
-                                # Replace newlines with HTML breaks for the custom div
                                 html_ans = str(raw_ans).replace("\n", "<br>")
                                 st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
 
@@ -196,7 +194,7 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their work (this may take a moment for a full class)..."):
                 instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile."
-                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
+                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
                 if answers: 
                     st.success("✅ All exit tickets collected!")
@@ -215,14 +213,12 @@ def render_academic_responses(df, cohort, subject="General"):
                     for _, row in df.iterrows():
                         name = row.get("Full Name")
                         raw_ans = answers.get(name, "No ticket submitted.")
-                        
-                        # Replace newlines with double newlines so Streamlit Markdown perfectly renders the line breaks
                         st_ans = str(raw_ans).replace("\n", "\n\n")
                         
                         with st.expander(f"🎫 {name}'s Ticket"):
                             col1, col2 = st.columns([1, 5])
                             with col1: display_student_photo(name, cohort)
-                            with col2: st.markdown(st_ans) # Native markdown handles LaTeX beautifully!
+                            with col2: st.markdown(st_ans)
 
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
@@ -275,7 +271,7 @@ def render_academic_responses(df, cohort, subject="General"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception. No commentary. Use new lines for math steps."
-                        answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
+                        answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject, teacher_name)
 
                         if answers:
                             student_reply = answers.get(target_name, "...")
@@ -284,7 +280,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
-                        # Format for line breaks
                         msg_text = str(msg["content"]).replace("\n", "\n\n")
                         if msg["role"] == "teacher":
                             with st.chat_message("user"): st.markdown(msg_text)
@@ -294,7 +289,7 @@ def render_academic_responses(df, cohort, subject="General"):
                     follow_up = st.chat_input(f"Probe {target_name} deeper...")
                     if follow_up:
                         st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
-                        st.rerun() # Refresh to show the user's message, AI will respond below
+                        st.rerun() 
                         
                         with st.spinner(f"{target_name} is thinking..."):
                             target_row = df[df["Full Name"] == target_name].iloc[0]
@@ -304,13 +299,14 @@ def render_academic_responses(df, cohort, subject="General"):
 
                             chat_prompt = f"""
                             You are roleplaying as {target_name}, a {cohort} student. Target Grade: {target_grade}, SEN: {target_sen}.
-                            The subject is {subject}. 
+                            The subject is {subject}. The teacher's name/title is {teacher_name}.
 
                             Here is the conversation so far:
                             {transcript}
 
                             Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
-                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. Do not include commentary. Use new lines if demonstrating steps.
+                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. 
+                            You may naturally address the teacher as {teacher_name}. Do not include commentary. Use new lines if demonstrating steps.
                             """
                             
                             model = genai.GenerativeModel('gemini-2.5-flash')
@@ -342,7 +338,7 @@ def render_academic_responses(df, cohort, subject="General"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer based on their profile. Include hesitation or filler words ('Umm') if appropriate. NO commentary. Use new lines for math steps."
-                        answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
+                        answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject, teacher_name)
                         
                         if answers:
                             student_reply = answers.get(target_name, "...")
@@ -370,12 +366,13 @@ def render_academic_responses(df, cohort, subject="General"):
                         
                         chat_prompt = f"""
                         You are roleplaying as {target_name}, a {cohort} student. Target Grade: {target_grade}, SEN: {target_sen}.
-                        The subject is {subject}. 
+                        The subject is {subject}. The teacher's name/title is {teacher_name}.
                         
                         Here is the conversation so far:
                         {transcript}
                         
-                        Respond to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. NO commentary. Use new lines for math steps.
+                        Respond to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. 
+                        You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
                         """
                         
                         model = genai.GenerativeModel('gemini-2.5-flash')
