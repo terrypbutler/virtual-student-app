@@ -283,6 +283,6 @@ elif page == "Academic AfL":
     
     st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
 
-    # 4. Render the module!
+    # 4. Render the module
     from modules.academic_responses import render_academic_responses
     render_academic_responses(filtered_df, cohort, selected_subject)
