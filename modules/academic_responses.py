@@ -122,8 +122,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("
-```", "").strip())
+            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -132,7 +131,6 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
                 st.error("🚦 AI exhausted. Please wait 60 seconds.")
                 return {}
     return {}
-
 def render_academic_responses(df, cohort, subject="General"):
     st.subheader(f"🎓 AfL Simulator: {subject} Questioning")
     
