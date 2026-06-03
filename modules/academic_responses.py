@@ -32,7 +32,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         ".student-box { border: 2px solid #ddd; padding: 20px; margin-bottom: 25px; border-radius: 8px; }",
         ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
         ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
-        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; }",
+        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; white-space: pre-wrap; }",
         ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
         ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
         "</style></head><body>",
@@ -56,7 +56,10 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         name = row.get("Full Name", "Unknown")
         grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
         sen = get_flexible_text(row, ["SEN Status", "SEND Status"])
-        ans = answers.get(name, "No response submitted.")
+        
+        # Ensure we pull the text safely and convert newlines to HTML breaks
+        raw_ans = answers.get(name, "No response submitted.")
+        html_ans = str(raw_ans).replace("\n", "<br>")
 
         profile_text = f"Target: {grade}"
         if sen and sen.upper() not in ["N/A", "NONE", "NO", "N", ""]:
@@ -65,7 +68,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         html.append(f"<div class='student-box'>")
         html.append(f"<div class='student-name'>{name}</div>")
         html.append(f"<div class='student-profile'>Context for Trainee: {profile_text}</div>")
-        html.append(f"<div class='student-answer'>{ans}</div>")
+        html.append(f"<div class='student-answer'>{html_ans}</div>")
         html.append(f"<div class='marking-area'><span class='marking-title'>Trainee Feedback / Next Steps:</span></div>")
         html.append(f"</div>")
 
@@ -102,6 +105,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     1. Ability Match: Scale vocabulary, accuracy, and depth to their Target Grade and KS2/SATs scores. 
     2. Deep Misconceptions: Inject realistic, {subject}-specific misconceptions or partial misunderstandings for lower grades.
     3. Attitude: Factor in suspensions and home context to randomly assign a mood.
+    4. Layout formatting: If the student's answer involves multiple steps of calculation or logic, you MUST put each step on a new line using a newline character (\\n).
     
     CRITICAL: Format math using standard text (e.g., x² or x^2), NO LaTeX.
     CRITICAL: Return ONLY a valid JSON dictionary where keys are exact student names and values are their answers.
@@ -161,7 +165,7 @@ def render_academic_responses(df, cohort, subject="General"):
         st.caption("Scans the whole room for quick, short-form answers.")
         if st.button("Show All Mini-Whiteboards", type="primary"):
             with st.spinner("Students are writing..."):
-                instructions = "Write exactly what the student would scribble on a whiteboard (max 6 words). DO NOT include commentary."
+                instructions = "Write exactly what the student would scribble on a whiteboard (max 8 words). DO NOT include commentary. Use new lines for math steps."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers:
@@ -173,14 +177,17 @@ def render_academic_responses(df, cohort, subject="General"):
                                 name = row.get("Full Name")
                                 display_student_photo(name, cohort)
                                 st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
-                                ans = answers.get(name, "?")
-                                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span></div>", unsafe_allow_html=True)
+                                
+                                raw_ans = answers.get(name, "?")
+                                html_ans = str(raw_ans).replace("\n", "<br>")
+                                
+                                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
 
     # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
-            with st.spinner("Students are writing their paragraphs (this may take a moment for a full class)..."):
+            with st.spinner("Students are writing their work (this may take a moment for a full class)..."):
                 instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
@@ -200,11 +207,13 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.markdown(f"### 📑 On-Screen Preview (Full Class)")
                     for _, row in df.iterrows():
                         name = row.get("Full Name")
-                        ans = answers.get(name, "No ticket submitted.")
+                        raw_ans = answers.get(name, "No ticket submitted.")
+                        html_ans = str(raw_ans).replace("\n", "<br>")
+                        
                         with st.expander(f"🎫 {name}'s Ticket"):
                             col1, col2 = st.columns([1, 5])
                             with col1: display_student_photo(name, cohort)
-                            with col2: st.write(ans)
+                            with col2: st.markdown(html_ans, unsafe_allow_html=True)
 
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
@@ -256,7 +265,7 @@ def render_academic_responses(df, cohort, subject="General"):
                 if len(st.session_state[chat_key]) == 0:
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
-                        instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception. No commentary."
+                        instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception. No commentary. Use new lines for math steps."
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
 
                         if answers:
@@ -290,7 +299,7 @@ def render_academic_responses(df, cohort, subject="General"):
                             {transcript}
 
                             Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
-                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. Do not include commentary.
+                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. Do not include commentary. Use new lines if demonstrating steps.
                             """
                             
                             model = genai.GenerativeModel('gemini-2.5-flash')
@@ -321,7 +330,7 @@ def render_academic_responses(df, cohort, subject="General"):
                 if st.button(f"🗣️ Ask {target_name} the opening question", type="primary"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
-                        instructions = "Generate a spoken answer based on their profile. Include hesitation or filler words ('Umm') if appropriate. NO commentary."
+                        instructions = "Generate a spoken answer based on their profile. Include hesitation or filler words ('Umm') if appropriate. NO commentary. Use new lines for math steps."
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
                         
                         if answers:
@@ -354,7 +363,7 @@ def render_academic_responses(df, cohort, subject="General"):
                         Here is the conversation so far:
                         {transcript}
                         
-                        Respond to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. NO commentary.
+                        Respond to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. NO commentary. Use new lines for math steps.
                         """
                         
                         model = genai.GenerativeModel('gemini-2.5-flash')
