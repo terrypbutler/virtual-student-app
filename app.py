@@ -19,8 +19,6 @@ YEAR_10_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWjfO_UYUARLvEty
 df_y7 = load_data(YEAR_7_URL)
 df_y10 = load_data(YEAR_10_URL)
 
-st.write(df_y7.columns.tolist())
-
 st.sidebar.title("🎓 Butler Academy")
 
 page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL"])
@@ -166,7 +164,7 @@ elif page == "Analytics":
     ks2_labels = ["80-84", "85-89", "90-94", "95-99", "100-104", "105-109", "110-114", "115-120"]
     
     with g1:
-        math_col = next((c for c in df.columns if c.strip().lower() in ["ks2 maths", "ks2 math", "sats maths", "SAT's Maths", "maths score"]), None)
+        math_col = next((c for c in df.columns if c.strip().lower() in ["ks2 maths", "ks2 math", "sats maths", "SATs Maths", "maths score"]), None)
         if math_col:
             st.markdown("**Maths Distribution**")
             counts = pd.cut(pd.to_numeric(df[math_col], errors='coerce').dropna(), bins=ks2_bins, labels=ks2_labels, right=False).value_counts().reindex(ks2_labels, fill_value=0)
@@ -183,7 +181,7 @@ elif page == "Analytics":
 
     st.write("---")
     st.subheader("Raw Data")
-    desired_cols = ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "Disadvantaged (PP)", "Ethnicity", "EAL Status", "SATs Reading", "SAT's Maths",""] if analytics_cohort == "Year 7" else ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "SEND Detail", "Disadvantaged (PP)", "Ethnicity", "KS2 Read", "KS2 Maths", "EAL Status", "Eng Lang Predicted Grade", "Eng Lit Predicted Grade", "Maths Predicted Grade", "Sci 1 Predicted Grade", "Sci 2 Predicted Grade", "Art Predicted Grade", "Computing Predicted Grade", "Design Predicted Grade", "Drama Predicted Grade", "Geography Predicted Grade", "History Predicted Grade", "Hospitality Predicted Grade", "Music Predicted Grade", "Photography Predicted Grade", "Spanish Predicted Grade", "Sport Predicted Grade", "Attendance %", "Suspension days"]
+    desired_cols = ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "Disadvantaged (PP)", "Ethnicity", "EAL Status", "SATs Reading", "SATs Maths",""] if analytics_cohort == "Year 7" else ["Full Name", "Form Group", "Maths Set", "DoB", "Gender", "SEN Status", "SEND Detail", "Disadvantaged (PP)", "Ethnicity", "KS2 Read", "KS2 Maths", "EAL Status", "Eng Lang Predicted Grade", "Eng Lit Predicted Grade", "Maths Predicted Grade", "Sci 1 Predicted Grade", "Sci 2 Predicted Grade", "Art Predicted Grade", "Computing Predicted Grade", "Design Predicted Grade", "Drama Predicted Grade", "Geography Predicted Grade", "History Predicted Grade", "Hospitality Predicted Grade", "Music Predicted Grade", "Photography Predicted Grade", "Spanish Predicted Grade", "Sport Predicted Grade", "Attendance %", "Suspension days"]
     st.dataframe(df[[col for col in desired_cols if col in df.columns]], use_container_width=True)
 
 elif page == "Seating Plan":
