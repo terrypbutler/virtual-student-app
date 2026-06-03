@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import json
 import time
+import random
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
@@ -17,7 +18,6 @@ def get_flexible_text(row, possible_names):
     return "Unknown"
 
 def create_printable_worksheet(question, answers, df, subject, cohort):
-    """Generates a clean, A4-ready HTML worksheet for trainees to practice physical marking."""
     html = [
         "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Marking Practice</title>",
         "<style>",
@@ -160,20 +160,16 @@ def render_academic_responses(df, cohort, subject="General"):
                                 ans = answers.get(name, "?")
                                 st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{ans}</span></div>", unsafe_allow_html=True)
 
-   # --- MODE: EXIT TICKETS ---
+    # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their paragraphs (this may take a moment for a full class)..."):
-                
-                # We removed the target_df limit here so it uses the full 'df'
                 instructions = "Generate a detailed, full-sentence explanation (2 to 4 sentences) for EACH student. Include bracketed visual formatting descriptions."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers: 
                     st.success("✅ All exit tickets collected!")
-                    
-                    # Pass the full 'df' to the worksheet generator
                     html_worksheet = create_printable_worksheet(teacher_question, answers, df, subject, cohort)
                     st.download_button(
                         label="🖨️ Download as Printable Worksheet",
@@ -185,8 +181,6 @@ def render_academic_responses(df, cohort, subject="General"):
                         use_container_width=True
                     )
                     st.markdown("---")
-                    
-                    # Display the full class on screen
                     st.markdown(f"### 📑 On-Screen Preview (Full Class)")
                     for _, row in df.iterrows():
                         name = row.get("Full Name")
@@ -195,20 +189,111 @@ def render_academic_responses(df, cohort, subject="General"):
                             col1, col2 = st.columns([1, 5])
                             with col1: display_student_photo(name, cohort)
                             with col2: st.write(ans)
+
     # --- MODE: HANDS UP ---
     elif mode == "🙋 Hands Up (Volunteers)":
-        st.caption("Simulates 5 students volunteering to answer the question.")
-        if st.button("See who raised their hand...", type="primary"):
-            with st.spinner("Looking around..."):
-                volunteers_df = df.sample(n=min(5, len(df)))
-                instructions = "Generate a spoken answer for EACH student. They volunteered, so they feel confident, but may share a confident misconception."
-                answers = fetch_ai_answers(teacher_question, volunteers_df, instructions, uploaded_file, cohort, subject)
-                
-                if answers:
-                    for _, row in volunteers_df.iterrows():
-                        name = row.get("Full Name")
-                        ans = answers.get(name, "...")
-                        st.markdown(f"<div style='background-color: #f8f9fa; border-left: 5px solid #f1c40f; padding: 15px; margin-bottom: 10px; border-radius: 4px;'><strong>{name} raises their hand:</strong> \"{ans}\"</div>", unsafe_allow_html=True)
+        st.caption("A random number of students will volunteer. Select one to hear their answer and probe deeper.")
+        
+        # Initialize memory for volunteers
+        if "hu_volunteers" not in st.session_state:
+            st.session_state.hu_volunteers = []
+        if "hu_selected" not in st.session_state:
+            st.session_state.hu_selected = None
+
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("🙋 Ask for Volunteers", type="primary", use_container_width=True):
+                # Pick a random number of students (between 2 and 5 so the pictures fit nicely)
+                num_vols = random.randint(2, min(5, len(df)))
+                vol_df = df.sample(n=num_vols)
+                st.session_state.hu_volunteers = vol_df["Full Name"].tolist()
+                st.session_state.hu_selected = None
+                st.rerun()
+            if st.button("🔄 Clear Hands", use_container_width=True):
+                st.session_state.hu_volunteers = []
+                st.session_state.hu_selected = None
+                st.rerun()
+
+        st.markdown("---")
+
+        # State 1: Hands are raised, but no one is selected yet
+        if st.session_state.hu_volunteers and not st.session_state.hu_selected:
+            st.markdown("### 🖐️ Look who raised their hand:")
+            
+            # Display pictures in a nice horizontal row
+            cols = st.columns(len(st.session_state.hu_volunteers))
+            for idx, vol_name in enumerate(st.session_state.hu_volunteers):
+                with cols[idx]:
+                    display_student_photo(vol_name, cohort)
+                    if st.button(f"Call on {vol_name}", key=f"btn_{vol_name}", use_container_width=True):
+                        st.session_state.hu_selected = vol_name
+                        st.rerun()
+
+        # State 2: A student has been selected, start the chat!
+        elif st.session_state.hu_selected:
+            target_name = st.session_state.hu_selected
+            st.markdown(f"### 🗣️ You called on {target_name}")
+
+            chat_key = f"probe_chat_{target_name}"
+            if chat_key not in st.session_state:
+                st.session_state[chat_key] = []
+
+            col_a, col_b = st.columns([1, 4])
+            with col_a:
+                display_student_photo(target_name, cohort)
+                if st.button("🔄 Pick Someone Else", use_container_width=True):
+                    st.session_state.hu_selected = None
+                    st.rerun()
+
+            with col_b:
+                if len(st.session_state[chat_key]) == 0:
+                    with st.spinner(f"Waiting for {target_name} to respond..."):
+                        target_df = df[df["Full Name"] == target_name]
+                        instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception."
+                        answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
+
+                        if answers:
+                            student_reply = answers.get(target_name, "...")
+                            st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
+                            st.session_state[chat_key].append({"role": "student", "content": student_reply})
+                            st.rerun()
+                else:
+                    for msg in st.session_state[chat_key]:
+                        if msg["role"] == "teacher":
+                            with st.chat_message("user"): st.write(msg["content"])
+                        else:
+                            with st.chat_message("assistant"): st.write(msg["content"])
+
+                    follow_up = st.chat_input(f"Probe {target_name} deeper...")
+                    if follow_up:
+                        st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
+                        with st.chat_message("user"): st.write(follow_up)
+
+                        with st.spinner(f"{target_name} is thinking..."):
+                            target_row = df[df["Full Name"] == target_name].iloc[0]
+                            target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
+                            target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
+                            transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
+
+                            chat_prompt = f"""
+                            You are roleplaying as {target_name}, a {cohort} student. Target Grade: {target_grade}, SEN: {target_sen}.
+                            The subject is {subject}. 
+
+                            Here is the conversation so far:
+                            {transcript}
+
+                            Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
+                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused.
+                            """
+                            
+                            # Interactive Chat stays on Flash for safety/speed
+                            model = genai.GenerativeModel('gemini-2.5-flash')
+                            try:
+                                reply = model.generate_content(chat_prompt)
+                                st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                                st.rerun()
+                            except Exception as e:
+                                st.error("Failed to generate response. You may have hit the speed limit.")
 
     # --- MODE: COLD CALL (INTERACTIVE PROBING) ---
     elif mode == "🎯 Cold Call (Interactive Probing)":
