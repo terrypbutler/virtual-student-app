@@ -37,8 +37,6 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
         "</style></head><body>",
         f"<div class='header'><h2>ITT Marking Practice: {cohort} {subject}</h2></div>",
-        
-        # NEW: The Trainee Reflection Prompts injected right at the top
         "<div class='reflection-box'>",
         "<h3>Trainee Reflection Prompts:</h3>",
         "<ul>",
@@ -51,7 +49,6 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         "<li>Who needs feedback on presentation, not maths?</li>",
         "</ul>",
         "</div>",
-        
         f"<div class='question-box'><strong>Teacher's Prompt / Exit Ticket Question:</strong><br><br>{question}</div>"
     ]
 
@@ -117,8 +114,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("
-```", "").strip())
+            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -185,10 +181,7 @@ def render_academic_responses(df, cohort, subject="General"):
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their paragraphs (this may take a moment for a full class)..."):
-                
-                # NEW INSTRUCTIONS: Forcing the AI to strip commentary and write raw bookwork
                 instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile."
-                
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers: 
