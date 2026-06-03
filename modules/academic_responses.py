@@ -171,7 +171,7 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Show All Mini-Whiteboards", type="primary"):
             
             with st.spinner("Students are scribbling on their boards..."):
-                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief. If a child does not know write IDK. ? or similar. Don not use the teachers name."
+                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief. If a child does not know write IDK. ? or similar. Do not use the teachers name. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower reading grades, dyslexia or EAL status"
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
             if answers:
@@ -199,7 +199,7 @@ def render_academic_responses(df, cohort, subject="General"):
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their work (this may take a moment for a full class)..."):
-                instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile."
+                instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower reading grades, dyslexia or EAL status"
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
                 if answers: 
