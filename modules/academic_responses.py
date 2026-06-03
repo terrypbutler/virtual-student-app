@@ -166,27 +166,37 @@ def render_academic_responses(df, cohort, subject="General"):
         st.info("👆 Please type an opening question above to begin.")
         return
 
-    # --- MODE: MINI-WHITEBOARDS ---
+   # --- MODE: MINI-WHITEBOARDS ---
     if mode == "📝 Mini-Whiteboards (Whole Class)":
         st.caption("Scans the whole room for quick, short-form answers.")
         if st.button("Show All Mini-Whiteboards", type="primary"):
-            with st.spinner("Students are writing..."):
-                instructions = "Write exactly what the student would scribble on a whiteboard (max 10 words). DO NOT include commentary. Use new lines for math steps."
+            
+            # 1. The AI thinks while the students "write"
+            with st.spinner("Students are scribbling on their boards..."):
+                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief. If child would not know write IDK, ? or similar"
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
                 
-                if answers:
-                    num_cols = 5
-                    for i in range(0, len(df), num_cols):
-                        cols = st.columns(num_cols)
-                        for col, (_, row) in zip(cols, df.iloc[i : i + num_cols].iterrows()):
-                            with col:
-                                name = row.get("Full Name")
-                                display_student_photo(name, cohort)
-                                st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
-                                
-                                raw_ans = answers.get(name, "?")
-                                html_ans = str(raw_ans).replace("\n", "<br>")
-                                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+            if answers:
+                # 2. The Dramatic Classroom Countdown!
+                reveal_text = st.empty()
+                for word in ["Three...", "Two...", "One...", "Show me!"]:
+                    reveal_text.markdown(f"<h2 style='text-align: center; color: #E67E22;'>{word}</h2>", unsafe_allow_html=True)
+                    time.sleep(0.7)
+                reveal_text.empty() # Clears the text right as the boards flip over
+                
+                # 3. Draw the whiteboards
+                num_cols = 5
+                for i in range(0, len(df), num_cols):
+                    cols = st.columns(num_cols)
+                    for col, (_, row) in zip(cols, df.iloc[i : i + num_cols].iterrows()):
+                        with col:
+                            name = row.get("Full Name")
+                            display_student_photo(name, cohort)
+                            st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
+                            
+                            raw_ans = answers.get(name, "?")
+                            html_ans = str(raw_ans).replace("\n", "<br>")
+                            st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
 
     # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
@@ -227,10 +237,11 @@ def render_academic_responses(df, cohort, subject="General"):
         if "hu_volunteers" not in st.session_state: st.session_state.hu_volunteers = []
         if "hu_selected" not in st.session_state: st.session_state.hu_selected = None
 
-        col1, col2 = st.columns([1, 4])
+col1, col2 = st.columns([1, 4])
         with col1:
             if st.button("🙋 Ask for Volunteers", type="primary", use_container_width=True):
-                num_vols = random.randint(2, min(5, len(df)))
+                # Now picks between 3 and 10 students
+                num_vols = random.randint(3, min(10, len(df)))
                 vol_df = df.sample(n=num_vols)
                 st.session_state.hu_volunteers = vol_df["Full Name"].tolist()
                 st.session_state.hu_selected = None
@@ -239,6 +250,22 @@ def render_academic_responses(df, cohort, subject="General"):
                 st.session_state.hu_volunteers = []
                 st.session_state.hu_selected = None
                 st.rerun()
+
+        st.markdown("---")
+
+        if st.session_state.hu_volunteers and not st.session_state.hu_selected:
+            st.markdown("### 🖐️ Look who raised their hand:")
+            vols = st.session_state.hu_volunteers
+            
+            # Display pictures neatly in rows of 5 so they don't get squished!
+            for i in range(0, len(vols), 5):
+                cols = st.columns(5)
+                for idx, vol_name in enumerate(vols[i : i + 5]):
+                    with cols[idx]:
+                        display_student_photo(vol_name, cohort)
+                        if st.button(f"Call on {vol_name}", key=f"btn_{vol_name}", use_container_width=True):
+                            st.session_state.hu_selected = vol_name
+                            st.rerun()
 
         st.markdown("---")
 
