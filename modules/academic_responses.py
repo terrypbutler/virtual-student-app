@@ -23,16 +23,35 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         "<style>",
         "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #222; line-height: 1.5; }",
         "@media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .student-box { page-break-inside: avoid; } }",
-        ".header { text-align: center; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 30px; }",
-        ".question-box { background: #f8f9fa; padding: 15px; border-left: 5px solid #3498DB; margin-bottom: 30px; font-size: 16px; }",
+        ".header { text-align: center; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px; }",
+        ".reflection-box { background: #e8f4f8; border: 2px solid #3498DB; padding: 20px; margin-bottom: 30px; border-radius: 8px; }",
+        ".reflection-box h3 { margin-top: 0; color: #2C3E50; font-size: 18px; }",
+        ".reflection-box ul { margin: 0; padding-left: 20px; font-weight: bold; color: #333; font-size: 15px; }",
+        ".reflection-box li { margin-bottom: 6px; }",
+        ".question-box { background: #f8f9fa; padding: 15px; border-left: 5px solid #E67E22; margin-bottom: 30px; font-size: 16px; }",
         ".student-box { border: 2px solid #ddd; padding: 20px; margin-bottom: 25px; border-radius: 8px; }",
         ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
         ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
-        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; }",
+        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; }",
         ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
         ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
         "</style></head><body>",
         f"<div class='header'><h2>ITT Marking Practice: {cohort} {subject}</h2></div>",
+        
+        # NEW: The Trainee Reflection Prompts injected right at the top
+        "<div class='reflection-box'>",
+        "<h3>Trainee Reflection Prompts:</h3>",
+        "<ul>",
+        "<li>Who understands the problem but still loses marks?</li>",
+        "<li>Who doesn’t finish — and why?</li>",
+        "<li>Which responses would collapse under exam conditions?</li>",
+        "<li>If this was your class, what would you do now?</li>",
+        "<li>Who needs scaffolding not stretch?</li>",
+        "<li>Who needs slowing down not challenge?</li>",
+        "<li>Who needs feedback on presentation, not maths?</li>",
+        "</ul>",
+        "</div>",
+        
         f"<div class='question-box'><strong>Teacher's Prompt / Exit Ticket Question:</strong><br><br>{question}</div>"
     ]
 
@@ -98,7 +117,8 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
+            return json.loads(response.text.replace("```json", "").replace("
+```", "").strip())
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -145,7 +165,7 @@ def render_academic_responses(df, cohort, subject="General"):
         st.caption("Scans the whole room for quick, short-form answers.")
         if st.button("Show All Mini-Whiteboards", type="primary"):
             with st.spinner("Students are writing..."):
-                instructions = "Generate a realistic, short answer (maximum 6 words) for EACH student. Focus heavily on quick misconceptions."
+                instructions = "Write exactly what the student would scribble on a whiteboard (max 6 words). DO NOT include commentary."
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers:
@@ -165,7 +185,10 @@ def render_academic_responses(df, cohort, subject="General"):
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their paragraphs (this may take a moment for a full class)..."):
-                instructions = "Generate a detailed, full-sentence explanation (2 to 4 sentences) for EACH student. Include bracketed visual formatting descriptions."
+                
+                # NEW INSTRUCTIONS: Forcing the AI to strip commentary and write raw bookwork
+                instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile."
+                
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject)
                 
                 if answers: 
@@ -194,16 +217,12 @@ def render_academic_responses(df, cohort, subject="General"):
     elif mode == "🙋 Hands Up (Volunteers)":
         st.caption("A random number of students will volunteer. Select one to hear their answer and probe deeper.")
         
-        # Initialize memory for volunteers
-        if "hu_volunteers" not in st.session_state:
-            st.session_state.hu_volunteers = []
-        if "hu_selected" not in st.session_state:
-            st.session_state.hu_selected = None
+        if "hu_volunteers" not in st.session_state: st.session_state.hu_volunteers = []
+        if "hu_selected" not in st.session_state: st.session_state.hu_selected = None
 
         col1, col2 = st.columns([1, 4])
         with col1:
             if st.button("🙋 Ask for Volunteers", type="primary", use_container_width=True):
-                # Pick a random number of students (between 2 and 5 so the pictures fit nicely)
                 num_vols = random.randint(2, min(5, len(df)))
                 vol_df = df.sample(n=num_vols)
                 st.session_state.hu_volunteers = vol_df["Full Name"].tolist()
@@ -216,11 +235,8 @@ def render_academic_responses(df, cohort, subject="General"):
 
         st.markdown("---")
 
-        # State 1: Hands are raised, but no one is selected yet
         if st.session_state.hu_volunteers and not st.session_state.hu_selected:
             st.markdown("### 🖐️ Look who raised their hand:")
-            
-            # Display pictures in a nice horizontal row
             cols = st.columns(len(st.session_state.hu_volunteers))
             for idx, vol_name in enumerate(st.session_state.hu_volunteers):
                 with cols[idx]:
@@ -229,14 +245,12 @@ def render_academic_responses(df, cohort, subject="General"):
                         st.session_state.hu_selected = vol_name
                         st.rerun()
 
-        # State 2: A student has been selected, start the chat!
         elif st.session_state.hu_selected:
             target_name = st.session_state.hu_selected
             st.markdown(f"### 🗣️ You called on {target_name}")
 
             chat_key = f"probe_chat_{target_name}"
-            if chat_key not in st.session_state:
-                st.session_state[chat_key] = []
+            if chat_key not in st.session_state: st.session_state[chat_key] = []
 
             col_a, col_b = st.columns([1, 4])
             with col_a:
@@ -249,7 +263,7 @@ def render_academic_responses(df, cohort, subject="General"):
                 if len(st.session_state[chat_key]) == 0:
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
-                        instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception."
+                        instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception. No commentary."
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
 
                         if answers:
@@ -283,10 +297,9 @@ def render_academic_responses(df, cohort, subject="General"):
                             {transcript}
 
                             Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
-                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused.
+                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. Do not include commentary.
                             """
                             
-                            # Interactive Chat stays on Flash for safety/speed
                             model = genai.GenerativeModel('gemini-2.5-flash')
                             try:
                                 reply = model.generate_content(chat_prompt)
@@ -301,9 +314,7 @@ def render_academic_responses(df, cohort, subject="General"):
         target_name = st.selectbox("Select student to Cold Call:", df["Full Name"].tolist())
         
         chat_key = f"probe_chat_{target_name}"
-        
-        if chat_key not in st.session_state:
-            st.session_state[chat_key] = []
+        if chat_key not in st.session_state: st.session_state[chat_key] = []
             
         col1, col2 = st.columns([1, 4])
         with col1:
@@ -317,7 +328,7 @@ def render_academic_responses(df, cohort, subject="General"):
                 if st.button(f"🗣️ Ask {target_name} the opening question", type="primary"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
-                        instructions = "Generate a spoken answer for this specific student based on their profile. Include hesitation or filler words ('Umm') if appropriate."
+                        instructions = "Generate a spoken answer based on their profile. Include hesitation or filler words ('Umm') if appropriate. NO commentary."
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject)
                         
                         if answers:
@@ -350,8 +361,7 @@ def render_academic_responses(df, cohort, subject="General"):
                         Here is the conversation so far:
                         {transcript}
                         
-                        Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
-                        If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused.
+                        Respond to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. NO commentary.
                         """
                         
                         model = genai.GenerativeModel('gemini-2.5-flash')
