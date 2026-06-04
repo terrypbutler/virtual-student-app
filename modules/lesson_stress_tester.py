@@ -179,9 +179,12 @@ def render_stress_tester(df, cohort, subject="General"):
 
             try:
                 response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-                raw_json = response.text.replace("```json", "").replace("
-```", "").strip()
-                result = json.loads(raw_json)
+                
+                # COPY-PASTE SAFE JSON EXTRACTION
+                raw_text = response.text
+                raw_text = raw_text.replace("`" * 3 + "json", "")
+                raw_text = raw_text.replace("`" * 3, "")
+                result = json.loads(raw_text.strip())
                 
                 # --- 3. RENDER THE DASHBOARD ---
                 st.success("✅ Simulation Matrix Compiled!")
@@ -200,7 +203,7 @@ def render_stress_tester(df, cohort, subject="General"):
                 
                 st.divider()
                 
-                # Zone 2: Pedagogy Critique (Now 2x2 grid to fit Curriculum)
+                # Zone 2: Pedagogy Critique
                 st.markdown("### 🧠 'First Principles' & Curriculum Critique")
                 critique = result.get("critique", {})
                 
