@@ -39,12 +39,23 @@ if page == "Student Search":
 elif page == "Year 7":
     df = df_y7 
     st.sidebar.subheader("🔎 Filters (Year 7)")
-    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df, "Form Group"))
-    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df, "Maths Set"))
-
+    
+    # NEW: Explicit Grouping Choice
+    grouping_style = st.sidebar.radio("View Class By:", ["Mixed Ability (Tutor Groups)", "Streamed Sets (Maths)"], key="y7_group")
+    
     filtered_df = df.copy()
-    if selected_form: filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
-    if selected_math: filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
+    
+    if grouping_style == "Mixed Ability (Tutor Groups)":
+        available_forms = safe_unique(df, "Form Group")
+        selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="y7_form")
+        if selected_form != "All Tutor Groups":
+            filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+            
+    else:
+        available_sets = safe_unique(df, "Maths Set")
+        selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="y7_set")
+        if selected_set != "All Sets":
+            filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
 
     st.sidebar.divider()
     report_option = st.sidebar.radio("Select Report Detail", ["Base Passport (No Details)", "Short Report (Portrait & Home Life)", "Detailed Report (All Subjects)"])
@@ -83,16 +94,29 @@ elif page == "Year 7":
 elif page == "Year 10":
     df = df_y10 
     st.sidebar.subheader("🔎 Filters (Year 10)")
-    selected_form = st.sidebar.multiselect("Form Group (ALL by default)", safe_unique(df, "Form Group"))
-    selected_math = st.sidebar.multiselect("Maths Set (ALL by default)", safe_unique(df, "Maths Set"))
-
-    available_subjects = [c for c in ["Eng Lang","Eng Lit","Maths","Science","Art","Computing","Design","Drama","Geography","History","Hospitality","Music","Photography","Spanish","Sport"] if c in df.columns]
-    selected_subject = st.sidebar.selectbox("Subject (optional)", ["All Subjects"] + available_subjects)
-
+    
+    # NEW: 3-Way Explicit Grouping Choice
+    grouping_style = st.sidebar.radio("View Class By:", ["Mixed Ability (Tutor Groups)", "Streamed Sets (Maths/Science)", "Option Subject"], key="y10_group")
+    
     filtered_df = df.copy()
-    if selected_form: filtered_df = filtered_df[filtered_df["Form Group"].astype(str).isin(selected_form)]
-    if selected_math: filtered_df = filtered_df[filtered_df["Maths Set"].astype(str).isin(selected_math)]
-    if selected_subject != "All Subjects": filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
+    
+    if grouping_style == "Mixed Ability (Tutor Groups)":
+        available_forms = safe_unique(df, "Form Group")
+        selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="y10_form")
+        if selected_form != "All Tutor Groups":
+            filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+            
+    elif grouping_style == "Streamed Sets (Maths/Science)":
+        available_sets = safe_unique(df, "Maths Set")
+        selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="y10_set")
+        if selected_set != "All Sets":
+            filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
+            
+    elif grouping_style == "Option Subject":
+        available_subjects = [c for c in ["Art","Computing","Design","Drama","Geography","History","Hospitality","Music","Photography","Spanish","Sport"] if c in df.columns]
+        selected_subject = st.sidebar.selectbox("Select Option Subject:", ["Select Subject..."] + available_subjects, key="y10_sub")
+        if selected_subject != "Select Subject...":
+            filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
 
     st.sidebar.divider()
     report_option = st.sidebar.radio("Select Report Detail", ["Base Passport (No Details)", "Short Report (KS3 & Home Life)", "Detailed Report (All Subjects)"])
@@ -262,13 +286,20 @@ elif page == "Academic AfL":
     
     filtered_df = df_base.copy()
     
-    # 2. Conditional Dropdowns: The "If Maths/Science" Logic
+    # --- UPGRADED: Explicit Grouping Choice for Maths & Science ---
     if selected_subject in ["Maths", "Science"]:
-        available_sets = safe_unique(df_base, "Maths Set")
-        selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="afl_set")
-        if selected_set != "All Sets":
+        grouping_style = st.sidebar.radio("Class Grouping:", ["Streamed Sets", "Mixed Ability (Tutor Groups)"], key="afl_grouping")
+        
+        if grouping_style == "Streamed Sets":
+            available_sets = safe_unique(df_base, "Maths Set")
+            selected_set = st.sidebar.selectbox("Select Class Set:", available_sets, key="afl_set")
             filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
-            
+        else:
+            available_forms = safe_unique(df_base, "Form Group")
+            selected_form = st.sidebar.selectbox("Select Mixed Group:", ["Whole Cohort"] + available_forms, key="afl_mixed_form")
+            if selected_form != "Whole Cohort":
+                filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+                
     else:
         available_forms = safe_unique(df_base, "Form Group")
         selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="afl_form")
@@ -283,7 +314,7 @@ elif page == "Academic AfL":
     
     st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
 
-    # 4. Render the module
+    # 4. Render the module!
     from modules.academic_responses import render_academic_responses
     render_academic_responses(filtered_df, cohort, selected_subject)
 
@@ -299,18 +330,27 @@ elif page == "Lesson Stress-Tester":
     
     filtered_df = df_base.copy()
     
+    # --- NEW: Explicit Grouping Choice for Maths & Science ---
     if selected_subject in ["Maths", "Science"]:
-        available_sets = safe_unique(df_base, "Maths Set")
-        selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="stress_set")
-        if selected_set != "All Sets":
+        grouping_style = st.sidebar.radio("Class Grouping:", ["Streamed Sets", "Mixed Ability (Tutor Groups)"], key="stress_grouping")
+        
+        if grouping_style == "Streamed Sets":
+            available_sets = safe_unique(df_base, "Maths Set")
+            selected_set = st.sidebar.selectbox("Select Class Set:", available_sets, key="stress_set")
             filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
+        else:
+            available_forms = safe_unique(df_base, "Form Group")
+            selected_form = st.sidebar.selectbox("Select Mixed Group:", ["Whole Cohort"] + available_forms, key="stress_mixed_form")
+            if selected_form != "Whole Cohort":
+                filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+                
     else:
         available_forms = safe_unique(df_base, "Form Group")
         selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="stress_form")
         if selected_form != "All Tutor Groups":
             filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
 
-    # --- THE MISSING PIECE: Smart Option-Block Filtering (Year 10 Only) ---
+    # Smart Option-Block Filtering (Year 10 Only)
     if cohort == "Year 10" and selected_subject in df_base.columns and selected_subject not in ["Maths", "Science", "English"]:
         filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
 
