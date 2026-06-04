@@ -107,7 +107,7 @@ def render_stress_tester(df, cohort, subject="General"):
             if uploaded_file is not None:
                 contents.append(Image.open(uploaded_file))
 
-try:
+            try:
                 response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
                 raw_json = response.text.replace("```json", "").replace("```", "").strip()
                 result = json.loads(raw_json)
