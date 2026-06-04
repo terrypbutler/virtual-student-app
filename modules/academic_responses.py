@@ -76,7 +76,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
     html.append("</body></html>")
     return "\n".join(html)
 
-def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject, teacher_name):
+def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject, teacher_name, is_written=False):
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
     
     profiles = []
@@ -93,6 +93,12 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
         
     profiles_text = "\n".join(profiles)
     
+    # NEW: Dynamic Teacher Address Rule based on whether the task is Written or Spoken
+    if is_written:
+        address_rule = "4. Written Work: DO NOT use the teacher's name or titles like 'Sir' or 'Miss' in the response. It must read entirely like an exercise book or whiteboard."
+    else:
+        address_rule = f"4. Teacher Address: The students should occasionally use the teacher's name/title ('{teacher_name}') naturally in their verbal responses (e.g., 'I think it's 4, {teacher_name}')."
+    
     prompt = f"""
     A trainee teacher (addressed as '{teacher_name}') is conducting a {subject} lesson for a class of {cohort} students (approximate age: {age_context}).
     The teacher has asked the class: "{question}"
@@ -103,10 +109,10 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     {instructions}
     
     CRITICAL PEDAGOGICAL CONSTRAINTS:
-    1. Ability Match: Scale vocabulary, accuracy, and depth to their Target Grade and KS2/SATs scores. 
+    1. Ability Match: Scale vocabulary, accuracy, length, and depth to their Target Grade and KS2/SATs scores. 
     2. Deep Misconceptions: Inject realistic, {subject}-specific misconceptions or partial misunderstandings for lower grades.
     3. Attitude: Factor in suspensions and home context to randomly assign a mood.
-    4. Teacher Address: The students should occasionally use the teacher's name/title ('{teacher_name}') naturally in their responses (e.g., 'I think it's 4, {teacher_name}').
+    {address_rule}
     5. Math Formatting: Make maths look like real maths. DO NOT use raw carets (like r^2). You MUST use Unicode superscripts (e.g., r², x³, y₁) and symbols (π, √, ÷, ×, ±). For complex equations, use LaTeX wrapped in single `$` (e.g., `$x = \\frac{{1}}{{2}}$`).
     6. Layout: If the answer involves multiple steps of calculation, you MUST put each step on a new line using a newline character (\\n).
     
@@ -117,7 +123,8 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     
     for attempt in range(3):
         try:
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            # Upgraded to Pro model for the bulk generators!
+            model = genai.GenerativeModel('gemini-2.5-pro')
             contents = [prompt]
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
@@ -171,8 +178,9 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Show All Mini-Whiteboards", type="primary"):
             
             with st.spinner("Students are scribbling on their boards..."):
-                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include names or commentary. Be extremely brief. If a child does not know write IDK. ? or similar. Do not use the teachers name. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower reading grades, dyslexia or EAL status"
-                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
+                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include commentary. Be extremely brief. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower target grades, SEN, or EAL status."
+                # Note: is_written=True
+                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name, is_written=True)
                 
             if answers:
                 reveal_text = st.empty()
@@ -198,9 +206,11 @@ def render_academic_responses(df, cohort, subject="General"):
     elif mode == "🚪 Exit Tickets (Detailed)":
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
-            with st.spinner("Students are writing their work (this may take a moment for a full class)..."):
-                instructions = "Write EXACTLY what the student would write in their exercise book. DO NOT include any commentary, AI explanation, or context outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. Include crossed-out mistakes, incomplete sentences, or margin doodles if appropriate to their profile. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower reading grades, dyslexia or EAL status"
-                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name)
+            with st.spinner("Students are writing their work (this may take a moment for a full class on the Pro model)..."):
+                # NEW: Explicitly asking for longer, more detailed written answers where appropriate.
+                instructions = "Write EXACTLY what the student would write in their exercise book. Make the written answers longer and more detailed (a full paragraph or multiple working steps) where appropriate for the student's target grade. DO NOT include commentary or AI explanation outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. CRITICAL: Include crossed-out mistakes, incomplete sentences, margin doodles, and realistic spelling/grammar errors highly tailored to their target grade, SEN, and EAL profile."
+                # Note: is_written=True
+                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name, is_written=True)
                 
                 if answers: 
                     st.success("✅ All exit tickets collected!")
@@ -280,6 +290,7 @@ def render_academic_responses(df, cohort, subject="General"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception. No commentary. Use new lines for math steps."
+                        # Note: is_written is False by default for spoken interactions
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject, teacher_name)
 
                         if answers:
@@ -347,6 +358,7 @@ def render_academic_responses(df, cohort, subject="General"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer based on their profile. Include hesitation or filler words ('Umm') if appropriate. NO commentary. Use new lines for math steps."
+                        # Note: is_written is False by default for spoken interactions
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject, teacher_name)
                         
                         if answers:
