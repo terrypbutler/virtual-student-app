@@ -31,6 +31,7 @@ def render_stress_tester(df, cohort, subject="General"):
     st.sidebar.markdown("### 🧬 Simulation Frameworks")
     st.sidebar.caption(
         "This stress-test evaluates your lesson against standard UK ITT Core Content Framework metrics:\n\n"
+        "* **UK National Curriculum:** Age-appropriate pitching for KS3/KS4.\n"
         "* **Rosenshine's Principles:** Small steps modeling, guided practice, active checks.\n"
         "* **Cognitive Load Theory (Sweller):** Working memory optimization & schema integration.\n"
         "* **Tom Sherrington's 'First Principles':** Explicit teaching mechanics.\n"
@@ -87,10 +88,16 @@ def render_stress_tester(df, cohort, subject="General"):
 
     # --- 2. EXECUTE THE STRESS TEST ---
     if st.button("🚀 Stress-Test Lesson", type="primary", use_container_width=True):
-        with st.spinner(f"Simulating the lesson against student profiles and passports..."):
+        with st.spinner(f"Simulating the lesson against student profiles and the National Curriculum..."):
             
-            # Compile complete student profiles
-            age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
+            # Contextualize Age and Curriculum Stage
+            if cohort == "Year 7":
+                age_context = "11 to 12 years old"
+                key_stage = "Key Stage 3 (KS3)"
+            else:
+                age_context = "14 to 15 years old"
+                key_stage = "Key Stage 4 (KS4 / GCSE)"
+
             profiles = []
             for _, row in df.iterrows():
                 name = row.get("Full Name", "Unknown")
@@ -100,8 +107,6 @@ def render_stress_tester(df, cohort, subject="General"):
                 math_score = get_flexible_text(row, ["KS2 Maths", "KS2 Math", "SATs Maths"])
                 read_score = get_flexible_text(row, ["KS2 Read", "KS2 Reading", "SATs Reading"])
                 susp = get_flexible_text(row, ["Suspension days", "Suspensions"])
-                
-                # Toning down the passport label so the AI doesn't over-fixate on it
                 home_passport = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Interests"])
                 
                 profiles.append(
@@ -114,7 +119,7 @@ def render_stress_tester(df, cohort, subject="General"):
             system_prompt = f"""
             You are an elite UK Higher Education Initial Teacher Training (ITT) tutor and curriculum mentor.
             You are conducting a lesson simulation audit for a trainee's lesson plan.
-            Subject: {subject}. Cohort: {cohort} (Age range: {age_context}).
+            Subject: {subject}. Cohort: {cohort} (Age range: {age_context}). Educational Stage: {key_stage}.
             
             You must evaluate this lesson plan against the complete data profiles of these {len(df)} students:
             {profiles_text}
@@ -123,10 +128,11 @@ def render_stress_tester(df, cohort, subject="General"):
             {final_lesson_content}
             
             ASSESSMENT MODEL OBJECTIVES:
-            1. Rosenshine's Principles of Instruction: Verify if complex tasks are broken down into small, digestible chunks with active modeling.
-            2. Cognitive Load Theory (Sweller): Identify hidden memory bottle-necks, lack of procedural automaticity, or layout/presentation overload.
-            3. Tom Sherrington's 'First Principles' of Teaching: Audit the transition formatting between instructional teaching, guided practice, and independent application.
-            4. Adaptive Teaching & Inclusion: Balance academic attainment (KS2 scores/target grades) with their SEN needs and personal backgrounds. Do not over-fixate on hobbies; prioritize academic scaffolding.
+            1. UK National Curriculum Alignment: Cross-reference the content pitch against the UK National Curriculum for {key_stage} {subject}. Flag if it is too elementary, developmentally inappropriate, or strays into A-Level complexity.
+            2. Rosenshine's Principles of Instruction: Verify if complex tasks are broken down into small, digestible chunks with active modeling.
+            3. Cognitive Load Theory (Sweller): Identify hidden memory bottle-necks, lack of procedural automaticity, or layout/presentation overload.
+            4. Tom Sherrington's 'First Principles' of Teaching: Audit the transition formatting between instructional teaching, guided practice, and independent application.
+            5. Adaptive Teaching & Inclusion: Balance academic attainment (KS2 scores/target grades) with their SEN needs and personal backgrounds. Do not over-fixate on hobbies; prioritize academic scaffolding.
 
             STRICT ANTI-PATTERN GUARDRAILS (CRITICAL):
             Under NO circumstances may your evaluation or actionable tweaks rely on debunked educational neuromyths. 
@@ -145,6 +151,7 @@ def render_stress_tester(df, cohort, subject="General"):
                 "pacing_detailed_desc": "<1 sentence detailing the pacing and transition flow behavior>"
               }},
               "critique": {{
+                "curriculum_pitch": "<1-2 sentences verifying if the pitch matches UK National Curriculum expectations for {key_stage} ({age_context})>",
                 "modeling": "<1-2 sentences critiquing modeling via Rosenshine/Sherrington models>",
                 "guided_practice": "<1-2 sentences evaluating the fading of scaffolding>",
                 "checking_for_understanding": "<1-2 sentences auditing the AfL tracking mechanisms>"
@@ -172,7 +179,8 @@ def render_stress_tester(df, cohort, subject="General"):
 
             try:
                 response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-                raw_json = response.text.replace("```json", "").replace("```", "").strip()
+                raw_json = response.text.replace("```json", "").replace("
+```", "").strip()
                 result = json.loads(raw_json)
                 
                 # --- 3. RENDER THE DASHBOARD ---
@@ -185,7 +193,6 @@ def render_stress_tester(df, cohort, subject="General"):
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Predicted Mastery", f"{metrics.get('predicted_mastery_count', 0)} / {len(df)}")
                 m2.metric("Working Memory Overload", f"{metrics.get('high_risk_overload_count', 0)} Students", delta="Scaffolding Required", delta_color="inverse")
-                # Enforcing the short 1-2 word label
                 m3.metric("Pacing Status", metrics.get('pacing_status_label', 'Review Flow'))
                 
                 if "pacing_detailed_desc" in metrics:
@@ -193,16 +200,17 @@ def render_stress_tester(df, cohort, subject="General"):
                 
                 st.divider()
                 
-                # Zone 2: Pedagogy Critique
-                st.markdown("### 🧠 'First Principles' Theoretical Critique")
+                # Zone 2: Pedagogy Critique (Now 2x2 grid to fit Curriculum)
+                st.markdown("### 🧠 'First Principles' & Curriculum Critique")
                 critique = result.get("critique", {})
-                c1, c2, c3 = st.columns(3)
+                
+                c1, c2 = st.columns(2)
                 with c1:
-                    st.info(f"**Modeling & Schema (Rosenshine)**\n\n{critique.get('modeling', 'N/A')}")
+                    st.info(f"**National Curriculum & Pitch ({key_stage})**\n\n{critique.get('curriculum_pitch', 'N/A')}")
+                    st.success(f"**Modeling & Schema (Rosenshine)**\n\n{critique.get('modeling', 'N/A')}")
                 with c2:
                     st.warning(f"**Guided Practice Mechanics**\n\n{critique.get('guided_practice', 'N/A')}")
-                with c3:
-                    st.success(f"**AfL Checkpoints (Sherrington)**\n\n{critique.get('checking_for_understanding', 'N/A')}")
+                    st.error(f"**AfL Checkpoints (Sherrington)**\n\n{critique.get('checking_for_understanding', 'N/A')}")
                 
                 st.divider()
                 
