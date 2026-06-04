@@ -89,7 +89,7 @@ def render_stress_tester(df, cohort, subject="General"):
     if st.button("🚀 Stress-Test Lesson", type="primary", use_container_width=True):
         with st.spinner(f"Simulating the lesson against student profiles and passports..."):
             
-            # Compile complete student profiles including deep Passport contexts
+            # Compile complete student profiles
             age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
             profiles = []
             for _, row in df.iterrows():
@@ -101,13 +101,13 @@ def render_stress_tester(df, cohort, subject="General"):
                 read_score = get_flexible_text(row, ["KS2 Read", "KS2 Reading", "SATs Reading"])
                 susp = get_flexible_text(row, ["Suspension days", "Suspensions"])
                 
-                # GRABBING DEEP PASSPORT DATA:
+                # Toning down the passport label so the AI doesn't over-fixate on it
                 home_passport = get_flexible_text(row, ["Home Life & Interests", "Home Life", "Interests"])
                 
                 profiles.append(
-                    f"- {name} | Target Grade: {grade} | KS2 Read Score: {read_score} | KS2 Math Score: {math_score} | "
-                    f"SEN Support: {sen} | EAL Status: {eal} | Past Suspensions: {susp} | "
-                    f"STUDENT PASSPORT (Home Context & Key Traits): {home_passport}"
+                    f"- {name} | Target Grade: {grade} | KS2 Read: {read_score} | KS2 Math: {math_score} | "
+                    f"SEN: {sen} | EAL: {eal} | Suspensions: {susp} | "
+                    f"Background/Interests: {home_passport}"
                 )
             profiles_text = "\n".join(profiles)
 
@@ -116,7 +116,7 @@ def render_stress_tester(df, cohort, subject="General"):
             You are conducting a lesson simulation audit for a trainee's lesson plan.
             Subject: {subject}. Cohort: {cohort} (Age range: {age_context}).
             
-            You must evaluate this lesson plan against the complete data profiles and Student Passports of these {len(df)} students:
+            You must evaluate this lesson plan against the complete data profiles of these {len(df)} students:
             {profiles_text}
             
             TRAINEE'S LESSON PLAN INPUT:
@@ -126,14 +126,14 @@ def render_stress_tester(df, cohort, subject="General"):
             1. Rosenshine's Principles of Instruction: Verify if complex tasks are broken down into small, digestible chunks with active modeling.
             2. Cognitive Load Theory (Sweller): Identify hidden memory bottle-necks, lack of procedural automaticity, or layout/presentation overload.
             3. Tom Sherrington's 'First Principles' of Teaching: Audit the transition formatting between instructional teaching, guided practice, and independent application.
-            4. Adaptive Teaching & Inclusion: Cross-reference the timeline against Student Passports (SEN/EAL/Disadvantaged). Determine if the lesson scaffolds UP for inclusivity, or falls into the trap of low expectations.
+            4. Adaptive Teaching & Inclusion: Balance academic attainment (KS2 scores/target grades) with their SEN needs and personal backgrounds. Do not over-fixate on hobbies; prioritize academic scaffolding.
 
             STRICT ANTI-PATTERN GUARDRAILS (CRITICAL):
             Under NO circumstances may your evaluation or actionable tweaks rely on debunked educational neuromyths. 
             - DO NOT mention or validate VAK Learning Styles (Visual, Auditory, Kinesthetic).
             - DO NOT suggest "kinesthetic" activities as an intervention for SEN or engagement.
             - DO NOT reference left-brain/right-brain dominance.
-            - DO NOT reference the Learning Pyramid / Dale's Cone of Experience (e.g., "we remember 10% of what we read").
+            - DO NOT reference the Learning Pyramid / Dale's Cone of Experience.
             - Base all engagement strategies on motivation through success, schema building, and checking for understanding.
 
             TECHNICAL COMPLIANCE RULE: You must return ONLY a clean JSON object using this exact structure:
@@ -141,7 +141,7 @@ def render_stress_tester(df, cohort, subject="General"):
               "metrics": {{
                 "predicted_mastery_count": <int>,
                 "high_risk_overload_count": <int>,
-                "pacing_warning_label": "<Keep this extremely short: e.g., 'Stable', 'Pacing Risk: Phase 2', 'Early Finishers High'>",
+                "pacing_status_label": "<Strictly 1 to 2 words ONLY. e.g., 'Optimal', 'Too Fast', 'At Risk', 'Uneven'>",
                 "pacing_detailed_desc": "<1 sentence detailing the pacing and transition flow behavior>"
               }},
               "critique": {{
@@ -152,8 +152,8 @@ def render_stress_tester(df, cohort, subject="General"):
               "focus_group": [
                 {{
                   "name": "<Exact student name>",
-                  "profile_type": "<e.g., SEN Support Passport, High Attainer Passport>",
-                  "experience": "<1-2 sentences detailing how their passport needs and prior attainment will manifest in this specific lesson timeline>"
+                  "profile_type": "<e.g., SEN Support, High Attainer, Disengaged>",
+                  "experience": "<1-2 sentences detailing how they will cope, balancing their academic attainment with their background context>"
                 }}
               ],
               "actionable_tweaks": [
@@ -185,7 +185,8 @@ def render_stress_tester(df, cohort, subject="General"):
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Predicted Mastery", f"{metrics.get('predicted_mastery_count', 0)} / {len(df)}")
                 m2.metric("Working Memory Overload", f"{metrics.get('high_risk_overload_count', 0)} Students", delta="Scaffolding Required", delta_color="inverse")
-                m3.metric("Pacing Status", metrics.get('pacing_warning_label', 'Review Flow'))
+                # Enforcing the short 1-2 word label
+                m3.metric("Pacing Status", metrics.get('pacing_status_label', 'Review Flow'))
                 
                 if "pacing_detailed_desc" in metrics:
                     st.markdown(f"⏱️ **Pacing Analysis:** *{metrics.get('pacing_detailed_desc')}*")
@@ -206,15 +207,15 @@ def render_stress_tester(df, cohort, subject="General"):
                 st.divider()
                 
                 # Zone 3: Focus Group
-                st.markdown("### 🔬 Student Passport Focus Group")
-                st.caption("How specific student passports cross-referenced with prior attainment interact with your plan:")
+                st.markdown("### 🔬 Student Focus Group (Academic & Contextual)")
+                st.caption("How 4 specific students will likely experience this lesson based on their full profiles:")
                 focus_group = result.get("focus_group", [])
                 
                 cols = st.columns(2)
                 for idx, student in enumerate(focus_group[:4]):
                     col = cols[idx % 2]
                     with col:
-                        with st.expander(f"👤 {student.get('name', 'Student')} — {student.get('profile_type', 'Passport Profile')}", expanded=True):
+                        with st.expander(f"👤 {student.get('name', 'Student')} — {student.get('profile_type', 'Profile')}", expanded=True):
                             st.write(student.get("experience", "No data compiled."))
                             
                 st.divider()
