@@ -310,6 +310,10 @@ elif page == "Lesson Stress-Tester":
         if selected_form != "All Tutor Groups":
             filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
 
+    # --- THE MISSING PIECE: Smart Option-Block Filtering (Year 10 Only) ---
+    if cohort == "Year 10" and selected_subject in df_base.columns and selected_subject not in ["Maths", "Science", "English"]:
+        filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
+
     st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
 
     # 3. Render the module
