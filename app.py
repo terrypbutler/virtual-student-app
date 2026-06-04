@@ -21,7 +21,7 @@ df_y10 = load_data(YEAR_10_URL)
 
 st.sidebar.title("🎓 Butler Academy")
 
-page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL"])
+page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL", "Lesson Stress-Tester"])
 
 if page == "Student Search":
     st.title("🔍 Student Search (MIS View)")
@@ -286,3 +286,32 @@ elif page == "Academic AfL":
     # 4. Render the module
     from modules.academic_responses import render_academic_responses
     render_academic_responses(filtered_df, cohort, selected_subject)
+
+elif page == "Lesson Stress-Tester":
+    # 1. Select the base data
+    cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
+    df_base = df_y7 if cohort == "Year 7" else df_y10
+
+    # 2. Build the sidebar filters (Using the same setup as your AfL module)
+    st.sidebar.subheader(f"🔎 Class Setup ({cohort})")
+    all_subjects = ["Maths", "Science", "English", "Art", "Computing", "Design", "Drama", "Geography", "History", "Hospitality", "Music", "Photography", "Spanish", "Sport"]
+    selected_subject = st.sidebar.selectbox("Subject:", all_subjects, key="stress_sub")
+    
+    filtered_df = df_base.copy()
+    
+    if selected_subject in ["Maths", "Science"]:
+        available_sets = safe_unique(df_base, "Maths Set")
+        selected_set = st.sidebar.selectbox("Select Class Set:", ["All Sets"] + available_sets, key="stress_set")
+        if selected_set != "All Sets":
+            filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
+    else:
+        available_forms = safe_unique(df_base, "Form Group")
+        selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="stress_form")
+        if selected_form != "All Tutor Groups":
+            filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+
+    st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
+
+    # 3. Render the module
+    from modules.lesson_stress_tester import render_stress_tester
+    render_stress_tester(filtered_df, cohort, selected_subject)
