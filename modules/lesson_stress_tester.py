@@ -36,6 +36,9 @@ def render_stress_tester(df, cohort, subject="General"):
         "* **Tom Sherrington's 'First Principles':** Explicit teaching mechanics.\n"
         "* **Adaptive Teaching:** Differentiation by scaffolding rather than task-splitting."
     )
+    
+    st.sidebar.markdown("### 🚫 Anti-Patterns Enforced")
+    st.sidebar.caption("The AI is strictly constrained against deploying educational neuromyths (e.g., VAK Learning Styles, Dale's Cone, or Left/Right brain dominance).")
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Provide the Lesson Plan")
@@ -125,6 +128,14 @@ def render_stress_tester(df, cohort, subject="General"):
             3. Tom Sherrington's 'First Principles' of Teaching: Audit the transition formatting between instructional teaching, guided practice, and independent application.
             4. Adaptive Teaching & Inclusion: Cross-reference the timeline against Student Passports (SEN/EAL/Disadvantaged). Determine if the lesson scaffolds UP for inclusivity, or falls into the trap of low expectations.
 
+            STRICT ANTI-PATTERN GUARDRAILS (CRITICAL):
+            Under NO circumstances may your evaluation or actionable tweaks rely on debunked educational neuromyths. 
+            - DO NOT mention or validate VAK Learning Styles (Visual, Auditory, Kinesthetic).
+            - DO NOT suggest "kinesthetic" activities as an intervention for SEN or engagement.
+            - DO NOT reference left-brain/right-brain dominance.
+            - DO NOT reference the Learning Pyramid / Dale's Cone of Experience (e.g., "we remember 10% of what we read").
+            - Base all engagement strategies on motivation through success, schema building, and checking for understanding.
+
             TECHNICAL COMPLIANCE RULE: You must return ONLY a clean JSON object using this exact structure:
             {{
               "metrics": {{
@@ -167,7 +178,7 @@ def render_stress_tester(df, cohort, subject="General"):
                 # --- 3. RENDER THE DASHBOARD ---
                 st.success("✅ Simulation Matrix Compiled!")
                 
-                # Zone 1: Metrics (REWORKED TEXT WRAPPING)
+                # Zone 1: Metrics
                 st.markdown("### 📊 Class Survival Metrics")
                 metrics = result.get("metrics", {})
                 
@@ -176,7 +187,6 @@ def render_stress_tester(df, cohort, subject="General"):
                 m2.metric("Working Memory Overload", f"{metrics.get('high_risk_overload_count', 0)} Students", delta="Scaffolding Required", delta_color="inverse")
                 m3.metric("Pacing Status", metrics.get('pacing_warning_label', 'Review Flow'))
                 
-                # Safe typography injection for the descriptive text block under the metrics row
                 if "pacing_detailed_desc" in metrics:
                     st.markdown(f"⏱️ **Pacing Analysis:** *{metrics.get('pacing_detailed_desc')}*")
                 
