@@ -6,3 +6,5 @@ Pillow
 opencv-python-headless
 matplotlib
 google-generativeai
+PyPDF2==3.0.1
+python-docx==1.1.0
