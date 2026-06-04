@@ -39,7 +39,7 @@ def render_stress_tester(df, cohort, subject="General"):
     )
     
     st.sidebar.markdown("### 🚫 Anti-Patterns Enforced")
-    st.sidebar.caption("The AI is strictly constrained against deploying educational neuromyths (e.g., VAK Learning Styles, Dale's Cone, or Left/Right brain dominance).")
+    st.sidebar.caption("The AI is strictly constrained against deploying educational neuromyths (e.g., VAK Learning Styles) or superficial differentiation fads (e.g., 'Mild, Spicy, Hot' tasks).")
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Provide the Lesson Plan")
@@ -135,11 +135,12 @@ def render_stress_tester(df, cohort, subject="General"):
             5. Adaptive Teaching & Inclusion: Balance academic attainment (KS2 scores/target grades) with their SEN needs and personal backgrounds. Do not over-fixate on hobbies; prioritize academic scaffolding.
 
             STRICT ANTI-PATTERN GUARDRAILS (CRITICAL):
-            Under NO circumstances may your evaluation or actionable tweaks rely on debunked educational neuromyths. 
+            Under NO circumstances may your evaluation or actionable tweaks rely on debunked educational neuromyths or superficial differentiation fads. 
             - DO NOT mention or validate VAK Learning Styles (Visual, Auditory, Kinesthetic).
             - DO NOT suggest "kinesthetic" activities as an intervention for SEN or engagement.
             - DO NOT reference left-brain/right-brain dominance.
             - DO NOT reference the Learning Pyramid / Dale's Cone of Experience.
+            - DO NOT use or recommend "mild, spicy, hot" (or any similar tiered) challenge systems for differentiation. Differentiation should be achieved through scaffolding UP to high expectations, not by capping task difficulty and encouraging self-limiting behavior.
             - Base all engagement strategies on motivation through success, schema building, and checking for understanding.
 
             TECHNICAL COMPLIANCE RULE: You must return ONLY a clean JSON object using this exact structure:
