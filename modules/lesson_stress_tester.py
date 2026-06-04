@@ -43,7 +43,6 @@ def render_stress_tester(df, cohort, subject="General"):
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Provide the Lesson Plan")
-    lesson_text = st.text_area("Paste your lesson plan phases, notes, or learning objectives here (Optional if uploading a file):", height=150)
     uploaded_file = st.file_uploader("Upload your Lesson Plan document (PDF, Word, TXT, or Image):", type=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])
     
     extracted_text = ""
@@ -80,11 +79,11 @@ def render_stress_tester(df, cohort, subject="General"):
 
     st.markdown("---")
     
-    if not lesson_text and not uploaded_file:
-        st.info("👆 Please upload a plan or type your objective above to begin.")
+    if not uploaded_file:
+        st.info("👆 Please upload a lesson plan document to begin the simulation.")
         return
 
-    final_lesson_content = f"{lesson_text}\n\n{extracted_text}".strip()
+    final_lesson_content = extracted_text.strip()
 
     # --- 2. EXECUTE THE STRESS TEST ---
     if st.button("🚀 Stress-Test Lesson", type="primary", use_container_width=True):
