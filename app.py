@@ -292,7 +292,7 @@ elif page == "Lesson Stress-Tester":
     cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
     df_base = df_y7 if cohort == "Year 7" else df_y10
 
-    # 2. Build the sidebar filters (Using the same setup as your AfL module)
+    # 2. Build the sidebar filters
     st.sidebar.subheader(f"🔎 Class Setup ({cohort})")
     all_subjects = ["Maths", "Science", "English", "Art", "Computing", "Design", "Drama", "Geography", "History", "Hospitality", "Music", "Photography", "Spanish", "Sport"]
     selected_subject = st.sidebar.selectbox("Subject:", all_subjects, key="stress_sub")
