@@ -3,6 +3,8 @@ import google.generativeai as genai
 import json
 import time
 from PIL import Image
+import PyPDF2
+import docx
 
 def get_flexible_text(row, possible_names):
     """Helper to safely extract data from the row."""
@@ -26,17 +28,52 @@ def render_stress_tester(df, cohort, subject="General"):
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Provide the Lesson Plan")
-    lesson_text = st.text_area("Paste the lesson plan, activities, or learning objectives here:", height=150)
-    uploaded_file = st.file_uploader("Or upload a photo/screenshot of the plan:", type=['png', 'jpg', 'jpeg'])
+    lesson_text = st.text_area("Paste the lesson plan, activities, or learning objectives here (Optional if uploading):", height=150)
     
+    # UPGRADE: Added Document Support!
+    uploaded_file = st.file_uploader("Upload your Lesson Plan:", type=['pdf', 'docx', 'txt', 'png', 'jpg', 'jpeg'])
+    
+    extracted_text = ""
+    image_parts = []
+
+    # Process the uploaded file instantly
     if uploaded_file is not None:
-        st.image(uploaded_file, caption="Lesson Plan Resource", use_container_width=True)
+        file_ext = uploaded_file.name.split(".")[-1].lower()
+        
+        if file_ext in ["png", "jpg", "jpeg"]:
+            st.image(uploaded_file, caption="Lesson Plan Resource", use_container_width=True)
+            image_parts.append(Image.open(uploaded_file))
+            
+        elif file_ext == "pdf":
+            try:
+                pdf_reader = PyPDF2.PdfReader(uploaded_file)
+                for page in pdf_reader.pages:
+                    extracted_text += page.extract_text() + "\n"
+                st.success(f"📄 Successfully extracted {len(pdf_reader.pages)} pages from PDF.")
+            except Exception as e:
+                st.error(f"Error reading PDF: {e}")
+                
+        elif file_ext == "docx":
+            try:
+                doc = docx.Document(uploaded_file)
+                for para in doc.paragraphs:
+                    extracted_text += para.text + "\n"
+                st.success("📄 Successfully extracted text from Word Document.")
+            except Exception as e:
+                st.error(f"Error reading Word document: {e}")
+                
+        elif file_ext == "txt":
+            extracted_text = uploaded_file.getvalue().decode("utf-8")
+            st.success("📄 Successfully extracted text file.")
 
     st.markdown("---")
     
     if not lesson_text and not uploaded_file:
-        st.info("👆 Please provide lesson plan text or upload an image to begin.")
+        st.info("👆 Please provide lesson plan text or upload a file to begin.")
         return
+
+    # Combine any typed text with any extracted document text
+    final_lesson_content = f"{lesson_text}\n\n{extracted_text}".strip()
 
     # --- 2. EXECUTE THE STRESS TEST ---
     if st.button("🚀 Stress-Test Lesson", type="primary", use_container_width=True):
@@ -64,7 +101,7 @@ def render_stress_tester(df, cohort, subject="General"):
             {profiles_text}
             
             LESSON PLAN INFO:
-            {lesson_text}
+            {final_lesson_content}
             
             Your job is to stress-test this lesson plan by predicting how this specific cohort will experience it, grounding your evaluation in Rosenshine's Principles of Instruction and Cognitive Load Theory.
             
@@ -104,8 +141,8 @@ def render_stress_tester(df, cohort, subject="General"):
             # Call Gemini Pro
             model = genai.GenerativeModel('gemini-2.5-pro')
             contents = [system_prompt]
-            if uploaded_file is not None:
-                contents.append(Image.open(uploaded_file))
+            if image_parts:
+                contents.extend(image_parts)
 
             try:
                 response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
