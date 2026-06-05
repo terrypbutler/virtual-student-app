@@ -132,7 +132,8 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
+            return json.loads(response.text.replace("```json", "").replace("
+```", "").strip())
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -192,7 +193,6 @@ def render_academic_responses(df, cohort, subject="General"):
             with col_a:
                 display_student_photo(target_name, cohort)
                 
-                # NATIVE STREAMLIT WHITEBOARD CONTAINER (Centered & Enlarged)
                 raw_ans = st.session_state.wb_answers.get(target_name, "?")
                 md_ans = str(raw_ans).replace("\n", "\n\n")
                 
@@ -272,7 +272,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             display_student_photo(name, cohort)
                             st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                             
-                            # NATIVE STREAMLIT WHITEBOARD CONTAINER (Centered & Enlarged)
                             raw_ans = st.session_state.wb_answers.get(name, "?")
                             md_ans = str(raw_ans).replace("\n", "\n\n")
                             
@@ -294,12 +293,13 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their work (this may take a moment for a full class on the Pro model)..."):
                 
+                # --- NEW: Tiered Literacy Constraints ---
                 instructions = (
                     "Write EXACTLY what the student would write in their exercise book. "
-                    "Make the written answers longer and more detailed where appropriate for their target grade. "
-                    "CRITICAL REALISM FOR LOWER ABILITY: For students with lower target grades, inject realistic, subtle spelling, grammar, and punctuation errors (e.g., phonetic spelling of complex words, missing capital letters, run-on sentences, mixing up their/there). "
-                    "DO NOT turn them into caricatures or make them completely illiterate—make it look like genuine, struggling 11-15 year old work. "
-                    "Use Markdown strikethrough (~~like this~~) to show where they have crossed out a mistake and rewritten it. "
+                    "CRITICAL REALISM BY TARGET GRADE: You MUST scale the actual quality of the English, sentence structure, and vocabulary to their specific Target Grade.\n"
+                    "- Target Grade 7-9: Flawless or near-perfect grammar. Highly articulate, structured, and fluent. No forced errors.\n"
+                    "- Target Grade 4-6: Typical teenager. Mostly accurate, but might lack depth, use casual phrasing, or have occasional minor punctuation slips.\n"
+                    "- Target Grade 1-3: Noticeably weak literacy. Use very basic vocabulary, short fragmented sentences, and struggle to articulate the 'why'. They should sound like a student with a low reading age. Inject realistic spelling errors (phonetic spelling of hard words) and crossed-out mistakes using Markdown strikethrough (~~like this~~).\n"
                     "DO NOT include any AI commentary or explanation. Output raw student work only."
                 )
                 
