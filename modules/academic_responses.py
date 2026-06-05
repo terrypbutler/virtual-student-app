@@ -122,7 +122,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     
     for attempt in range(3):
         try:
-            model = genai.GenerativeModel('gemini-2.5-pro')
+            model = genai.GenerativeModel('gemini-3.5-flash')
             contents = [prompt]
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
@@ -229,7 +229,7 @@ def render_academic_responses(df, cohort, subject="General"):
                         You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
                         """
                         
-                        model = genai.GenerativeModel('gemini-2.5-pro')
+                        model = genai.GenerativeModel('gemini-3.5-flash')
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
@@ -408,7 +408,7 @@ def render_academic_responses(df, cohort, subject="General"):
                             You may naturally address the teacher as {teacher_name}. Do not include commentary. Use new lines if demonstrating steps.
                             """
                             
-                            model = genai.GenerativeModel('gemini-2.5-pro')
+                            model = genai.GenerativeModel('gemini-3.5-flash')
                             try:
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
@@ -474,7 +474,7 @@ def render_academic_responses(df, cohort, subject="General"):
                         You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
                         """
                         
-                        model = genai.GenerativeModel('gemini-2.5-pro')
+                        model = genai.GenerativeModel('gemini-3.5-flash')
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
