@@ -93,7 +93,6 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
         
     profiles_text = "\n".join(profiles)
     
-    # NEW: Dynamic Teacher Address Rule based on whether the task is Written or Spoken
     if is_written:
         address_rule = "4. Written Work: DO NOT use the teacher's name or titles like 'Sir' or 'Miss' in the response. It must read entirely like an exercise book or whiteboard."
     else:
@@ -123,7 +122,6 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
     
     for attempt in range(3):
         try:
-            # Upgraded to Pro model for the bulk generators!
             model = genai.GenerativeModel('gemini-2.5-pro')
             contents = [prompt]
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
@@ -146,6 +144,10 @@ def render_academic_responses(df, cohort, subject="General"):
         st.error("⚠️ Gemini API Key missing.")
         return
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+    # --- Session State Initialization ---
+    if "wb_answers" not in st.session_state: st.session_state.wb_answers = None
+    if "wb_probe_selected" not in st.session_state: st.session_state.wb_probe_selected = None
 
     # --- 1. THE INPUT AREA ---
     st.markdown("### 1. Present the Material")
@@ -174,21 +176,83 @@ def render_academic_responses(df, cohort, subject="General"):
 
     # --- MODE: MINI-WHITEBOARDS ---
     if mode == "📝 Mini-Whiteboards (Whole Class)":
-        st.caption("Scans the whole room for quick, short-form answers.")
-        if st.button("Show All Mini-Whiteboards", type="primary"):
+        st.caption("Scans the whole room for quick, short-form answers. Click 'Probe' under a student to question their specific answer.")
+        
+        # If a student is actively being probed, show the chat interface
+        if st.session_state.wb_probe_selected:
+            target_name = st.session_state.wb_probe_selected
+            st.markdown(f"### 🗣️ Probing {target_name}'s Whiteboard Answer")
             
-            with st.spinner("Students are scribbling on their boards..."):
-                instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include commentary. Be extremely brief. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower target grades, SEN, or EAL status. If a child does not know write IDK. ? or similar"
-                # Note: is_written=True
-                answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name, is_written=True)
-                
-            if answers:
-                reveal_text = st.empty()
-                for word in ["Three...", "Two...", "One...", "Show me!"]:
-                    reveal_text.markdown(f"<h2 style='text-align: center; color: #E67E22;'>{word}</h2>", unsafe_allow_html=True)
-                    time.sleep(0.7)
-                reveal_text.empty() 
-                
+            chat_key = f"probe_chat_{target_name}"
+            
+            col_a, col_b = st.columns([1, 4])
+            with col_a:
+                display_student_photo(target_name, cohort)
+                if st.button("🔙 Back to Whiteboards", use_container_width=True):
+                    st.session_state.wb_probe_selected = None
+                    st.rerun()
+                    
+            with col_b:
+                for msg in st.session_state[chat_key]:
+                    msg_text = str(msg["content"]).replace("\n", "\n\n")
+                    if msg["role"] == "teacher":
+                        with st.chat_message("user"): st.markdown(msg_text)
+                    else:
+                        with st.chat_message("assistant"): st.markdown(msg_text)
+                        
+                follow_up = st.chat_input(f"Ask {target_name} about their whiteboard answer...")
+                if follow_up:
+                    st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
+                    with st.chat_message("user"): st.markdown(follow_up)
+                    
+                    with st.spinner(f"{target_name} is thinking..."):
+                        target_row = df[df["Full Name"] == target_name].iloc[0]
+                        target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
+                        target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
+                        transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
+                        
+                        chat_prompt = f"""
+                        You are roleplaying as {target_name}, a {cohort} student. Target Grade: {target_grade}, SEN: {target_sen}.
+                        The subject is {subject}. The teacher's name/title is {teacher_name}.
+                        
+                        Here is the conversation so far. Note that your first response was a written answer on a mini-whiteboard:
+                        {transcript}
+                        
+                        Respond verbally to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. 
+                        You may naturally address the teacher as {teacher_name}. NO commentary. Use new lines for math steps.
+                        """
+                        
+                        model = genai.GenerativeModel('gemini-2.5-pro')
+                        try:
+                            reply = model.generate_content(chat_prompt)
+                            st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                            st.rerun()
+                        except Exception as e:
+                            st.error("Failed to generate response. You may have hit the speed limit.")
+                            
+        # If no one is being probed, show the Whiteboard Grid
+        else:
+            if st.session_state.wb_answers is None:
+                if st.button("Show All Mini-Whiteboards", type="primary"):
+                    with st.spinner("Students are scribbling on their boards..."):
+                        instructions = "Write ONLY the absolute minimum factual or mathematical answer the student would scribble on a whiteboard (1 to 4 words max). Do not write full sentences. Do not include commentary. Be extremely brief. CRITICAL: Inject realistic, age-appropriate spelling and grammar mistakes, particularly for students with lower target grades, SEN, or EAL status."
+                        answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name, is_written=True)
+                        
+                    if answers:
+                        reveal_text = st.empty()
+                        for word in ["Three...", "Two...", "One...", "Show me!"]:
+                            reveal_text.markdown(f"<h2 style='text-align: center; color: #E67E22;'>{word}</h2>", unsafe_allow_html=True)
+                            time.sleep(0.7)
+                        reveal_text.empty() 
+                        
+                        st.session_state.wb_answers = answers
+                        st.rerun()
+            else:
+                if st.button("🔄 Clear Whiteboards", type="secondary"):
+                    st.session_state.wb_answers = None
+                    st.rerun()
+                    
+                st.markdown("---")
                 num_cols = 5
                 for i in range(0, len(df), num_cols):
                     cols = st.columns(num_cols)
@@ -198,18 +262,27 @@ def render_academic_responses(df, cohort, subject="General"):
                             display_student_photo(name, cohort)
                             st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                             
-                            raw_ans = answers.get(name, "?")
+                            raw_ans = st.session_state.wb_answers.get(name, "?")
                             html_ans = str(raw_ans).replace("\n", "<br>")
-                            st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 20px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 10px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+                            
+                            # THE NEW PROBE BUTTON
+                            if st.button(f"🗣️ Probe", key=f"probe_{name}", use_container_width=True):
+                                st.session_state.wb_probe_selected = name
+                                chat_key = f"probe_chat_{name}"
+                                # Injecting the whiteboard answer as the first memory!
+                                st.session_state[chat_key] = [
+                                    {"role": "teacher", "content": teacher_question},
+                                    {"role": "student", "content": f"[Wrote on whiteboard]: {raw_ans}"}
+                                ]
+                                st.rerun()
 
     # --- MODE: EXIT TICKETS ---
     elif mode == "🚪 Exit Tickets (Detailed)":
         st.caption("Collects a detailed paragraph from every single student in the class.")
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their work (this may take a moment for a full class on the Pro model)..."):
-                # NEW: Explicitly asking for longer, more detailed written answers where appropriate.
                 instructions = "Write EXACTLY what the student would write in their exercise book. Make the written answers longer and more detailed (a full paragraph or multiple working steps) where appropriate for the student's target grade. DO NOT include commentary or AI explanation outside of the bracketed visual formatting description at the start. It must look like raw, unfiltered student work. CRITICAL: Include crossed-out mistakes, incomplete sentences, margin doodles, and realistic spelling/grammar errors highly tailored to their target grade, SEN, and EAL profile."
-                # Note: is_written=True
                 answers = fetch_ai_answers(teacher_question, df, instructions, uploaded_file, cohort, subject, teacher_name, is_written=True)
                 
                 if answers: 
@@ -290,7 +363,6 @@ def render_academic_responses(df, cohort, subject="General"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer. They volunteered, so they feel confident, but may confidently share a misconception. No commentary. Use new lines for math steps."
-                        # Note: is_written is False by default for spoken interactions
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject, teacher_name)
 
                         if answers:
@@ -358,7 +430,6 @@ def render_academic_responses(df, cohort, subject="General"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
                         instructions = "Generate a spoken answer based on their profile. Include hesitation or filler words ('Umm') if appropriate. NO commentary. Use new lines for math steps."
-                        # Note: is_written is False by default for spoken interactions
                         answers = fetch_ai_answers(teacher_question, target_df, instructions, uploaded_file, cohort, subject, teacher_name)
                         
                         if answers:
