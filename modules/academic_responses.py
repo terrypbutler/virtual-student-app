@@ -132,8 +132,13 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("
-```", "").strip())
+            
+            # COPY-PASTE SAFE JSON EXTRACTION
+            raw_text = response.text
+            raw_text = raw_text.replace("`" * 3 + "json", "")
+            raw_text = raw_text.replace("`" * 3, "")
+            return json.loads(raw_text.strip())
+            
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -193,6 +198,7 @@ def render_academic_responses(df, cohort, subject="General"):
             with col_a:
                 display_student_photo(target_name, cohort)
                 
+                # NATIVE STREAMLIT WHITEBOARD CONTAINER (Centered & Enlarged)
                 raw_ans = st.session_state.wb_answers.get(target_name, "?")
                 md_ans = str(raw_ans).replace("\n", "\n\n")
                 
