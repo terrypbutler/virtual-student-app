@@ -192,12 +192,12 @@ def render_academic_responses(df, cohort, subject="General"):
             with col_a:
                 display_student_photo(target_name, cohort)
                 
-                # NATIVE STREAMLIT WHITEBOARD CONTAINER (Fixes LaTeX rendering)
+                # NATIVE STREAMLIT WHITEBOARD CONTAINER (Centered & Enlarged)
                 raw_ans = st.session_state.wb_answers.get(target_name, "?")
                 md_ans = str(raw_ans).replace("\n", "\n\n")
                 
                 with st.container(border=True):
-                    st.markdown(md_ans)
+                    st.markdown(f"<div style='text-align: center; font-size: 1.4rem; padding: 15px 0;'>\n\n{md_ans}\n\n</div>", unsafe_allow_html=True)
                 
                 if st.button("🔙 Back to Whiteboards", use_container_width=True):
                     st.session_state.wb_probe_selected = None
@@ -272,12 +272,12 @@ def render_academic_responses(df, cohort, subject="General"):
                             display_student_photo(name, cohort)
                             st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                             
-                            # NATIVE STREAMLIT WHITEBOARD CONTAINER (Fixes LaTeX rendering)
+                            # NATIVE STREAMLIT WHITEBOARD CONTAINER (Centered & Enlarged)
                             raw_ans = st.session_state.wb_answers.get(name, "?")
                             md_ans = str(raw_ans).replace("\n", "\n\n")
                             
                             with st.container(border=True):
-                                st.markdown(md_ans)
+                                st.markdown(f"<div style='text-align: center; font-size: 1.4rem; padding: 15px 0;'>\n\n{md_ans}\n\n</div>", unsafe_allow_html=True)
                             
                             if st.button(f"🗣️ Probe", key=f"probe_{name}", use_container_width=True):
                                 st.session_state.wb_probe_selected = name
