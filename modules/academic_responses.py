@@ -3,58 +3,9 @@ import google.generativeai as genai
 import json
 import time
 import random
-import requests
-import re  # NEW: Added for formatting crossed-out text on the printout
+import re
 from PIL import Image
 from modules.photo_utils import display_student_photo
-
-# --- PREMIUM TTS: ELEVENLABS VOICE MAP ---
-# Replace these placeholder IDs with the actual Voice IDs from your ElevenLabs account.
-VOICE_MAP = {
-    "Liam": "pNInz6obbf5AWCG1",   # Example: Hesitant, deeper boy
-    "Sarah": "EXAVITQu4vr4xnSDx", # Example: Confident, fast girl
-    "Noah": "VR6AewLTigWG4xSOukaG",
-    "Emma": "ThT5KcBeYPX3keUQqHPh",
-    # Add your specific students here...
-    "DEFAULT": "21m00Tcm4TlvDq8ikWAM" # A fallback voice if a student isn't mapped
-}
-
-def get_elevenlabs_audio(text, voice_id):
-    """Silently generates premium speech audio using a specific student's ElevenLabs Voice ID."""
-    if "ELEVENLABS_API_KEY" not in st.secrets:
-        st.error("⚠️ ElevenLabs API Key missing in secrets.")
-        return None
-
-    # Fallback to a default voice if the spreadsheet cell is empty
-    if not voice_id or str(voice_id).upper() in ["NAN", "NONE", "", "N/A"]:
-        voice_id = "21m00Tcm4TlvDq8ikWAM" # Standard fallback ID
-
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    
-    headers = {
-        "xi-api-key": st.secrets["ELEVENLABS_API_KEY"],
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "text": text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75
-        }
-    }
-    
-    try:
-        response = requests.post(url, json=data, headers=headers)
-        if response.status_code == 200:
-            return response.content
-        else:
-            st.error(f"Audio Generation Error: {response.text}")
-            return None
-    except Exception as e:
-        st.error(f"Failed to fetch audio: {e}")
-        return None
 
 def get_flexible_text(row, possible_names):
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
@@ -85,7 +36,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
         ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
         ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; }",
-        "del { color: #d9534f; text-decoration: line-through; }", # Styling for crossed out text
+        "del { color: #d9534f; text-decoration: line-through; }", 
         ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
         ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
         "</style></head><body>",
@@ -112,7 +63,7 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         
         raw_ans = answers.get(name, "No response submitted.")
         
-        # --- NEW: Convert Markdown strikethrough (~~text~~) to HTML (<del>text</del>) for printing ---
+        # Converts Markdown strikethrough (~~text~~) to HTML (<del>text</del>) for printing
         html_ans = re.sub(r'~~(.*?)~~', r'<del>\1</del>', str(raw_ans))
         html_ans = html_ans.replace("\n", "<br>")
 
@@ -181,8 +132,7 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
             if uploaded_file is not None: contents.append(Image.open(uploaded_file))
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-            return json.loads(response.text.replace("```json", "").replace("
-```", "").strip())
+            return json.loads(response.text.replace("```json", "").replace("```", "").strip())
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 st.toast(f"🚦 AI Speed Limit hit. Auto-retrying in 20 seconds...")
@@ -242,9 +192,12 @@ def render_academic_responses(df, cohort, subject="General"):
             with col_a:
                 display_student_photo(target_name, cohort)
                 
+                # NATIVE STREAMLIT WHITEBOARD CONTAINER (Fixes LaTeX rendering)
                 raw_ans = st.session_state.wb_answers.get(target_name, "?")
-                html_ans = str(raw_ans).replace("\n", "<br>")
-                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin: 15px 0; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+                md_ans = str(raw_ans).replace("\n", "\n\n")
+                
+                with st.container(border=True):
+                    st.markdown(md_ans)
                 
                 if st.button("🔙 Back to Whiteboards", use_container_width=True):
                     st.session_state.wb_probe_selected = None
@@ -284,13 +237,6 @@ def render_academic_responses(df, cohort, subject="General"):
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
-                            
-                            target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_id = target_row.get("Voice ID", None)
-                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                            
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
@@ -326,9 +272,12 @@ def render_academic_responses(df, cohort, subject="General"):
                             display_student_photo(name, cohort)
                             st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                             
+                            # NATIVE STREAMLIT WHITEBOARD CONTAINER (Fixes LaTeX rendering)
                             raw_ans = st.session_state.wb_answers.get(name, "?")
-                            html_ans = str(raw_ans).replace("\n", "<br>")
-                            st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 10px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+                            md_ans = str(raw_ans).replace("\n", "\n\n")
+                            
+                            with st.container(border=True):
+                                st.markdown(md_ans)
                             
                             if st.button(f"🗣️ Probe", key=f"probe_{name}", use_container_width=True):
                                 st.session_state.wb_probe_selected = name
@@ -345,7 +294,6 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their work (this may take a moment for a full class on the Pro model)..."):
                 
-                # --- NEW: Anti-Caricature, Realistic Struggle Prompt ---
                 instructions = (
                     "Write EXACTLY what the student would write in their exercise book. "
                     "Make the written answers longer and more detailed where appropriate for their target grade. "
@@ -441,13 +389,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             student_reply = answers.get(target_name, "...")
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
-                            
-                            target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_id = target_row.get("Voice ID", None)
-                            audio_bytes = get_elevenlabs_audio(student_reply, student_voice_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                            
                             st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
@@ -484,13 +425,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             try:
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
-                                
-                                target_row = df[df["Full Name"] == target_name].iloc[0]
-                                student_voice_id = target_row.get("Voice ID", None)
-                                audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                                if audio_bytes:
-                                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                                
                                 st.rerun()
                             except Exception as e:
                                 st.error("Failed to generate response.")
@@ -522,13 +456,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             student_reply = answers.get(target_name, "...")
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
-                            
-                            target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_id = target_row.get("Voice ID", None)
-                            audio_bytes = get_elevenlabs_audio(student_reply, student_voice_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                            
                             st.rerun()
             else:
                 for msg in st.session_state[chat_key]:
@@ -564,13 +491,6 @@ def render_academic_responses(df, cohort, subject="General"):
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
-                            
-                            target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_id = target_row.get("Voice ID", None)
-                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                            
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
