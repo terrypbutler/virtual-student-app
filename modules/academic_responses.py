@@ -188,6 +188,13 @@ def render_academic_responses(df, cohort, subject="General"):
             col_a, col_b = st.columns([1, 4])
             with col_a:
                 display_student_photo(target_name, cohort)
+                
+                # --- THE NEW VISUAL WHITEBOARD INJECT ---
+                raw_ans = st.session_state.wb_answers.get(target_name, "?")
+                html_ans = str(raw_ans).replace("\n", "<br>")
+                st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin: 15px 0; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
+                # ----------------------------------------
+                
                 if st.button("🔙 Back to Whiteboards", use_container_width=True):
                     st.session_state.wb_probe_selected = None
                     st.rerun()
@@ -266,7 +273,7 @@ def render_academic_responses(df, cohort, subject="General"):
                             html_ans = str(raw_ans).replace("\n", "<br>")
                             st.markdown(f"<div style='background-color: #ffffff; border: 3px solid #2C3E50; border-radius: 6px; padding: 10px 5px; margin-bottom: 10px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);'><span style='color: #1a1a1a; font-size: 14px; font-weight: bold; text-align: center;'>{html_ans}</span></div>", unsafe_allow_html=True)
                             
-                            # THE NEW PROBE BUTTON
+                            # THE PROBE BUTTON
                             if st.button(f"🗣️ Probe", key=f"probe_{name}", use_container_width=True):
                                 st.session_state.wb_probe_selected = name
                                 chat_key = f"probe_chat_{name}"
