@@ -107,7 +107,7 @@ def render_simulator(df, cohort):
             # Call the AI (Using the Pro model for deep emotional/behavioral nuance)
             with st.spinner(f"{selected_student} is thinking..."):
                 try:
-                    model = genai.GenerativeModel('gemini-2.5-pro')
+                    model = genai.GenerativeModel('gemini-3.5-flash')
                     response = model.generate_content(system_prompt)
                     
                     # Save and show the student's response
