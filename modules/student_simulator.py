@@ -1,6 +1,36 @@
 import streamlit as st
 import google.generativeai as genai
+import asyncio
+import edge_tts
+import tempfile
 from modules.photo_utils import display_student_photo
+
+# --- MICROSOFT NEURAL TTS ENGINE (100% FREE & UNLIMITED) ---
+def get_edge_audio(text, voice_name="en-GB-RyanNeural"):
+    """Silently generates premium speech audio using Microsoft's free Neural voices."""
+    if not voice_name or str(voice_name).upper() in ["NAN", "NONE", "", "N/A"]:
+        voice_name = "en-GB-RyanNeural"
+        
+    async def _generate():
+        communicate = edge_tts.Communicate(text, str(voice_name).strip())
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            temp_path = f.name
+        await communicate.save(temp_path)
+        return temp_path
+
+    try:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        temp_file_path = loop.run_until_complete(_generate())
+        with open(temp_file_path, "rb") as audio_file:
+            return audio_file.read()
+    except Exception as e:
+        st.error(f"Failed to fetch Microsoft Neural audio: {e}")
+        return None
 
 def get_flexible_text(row, possible_names):
     """Helper to safely extract data from the row."""
@@ -40,6 +70,7 @@ def render_simulator(df, cohort):
     predicted = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
     suspensions = get_flexible_text(row, ["Suspension days", "Suspensions"])
     eal = get_flexible_text(row, ["EAL", "EAL Status"])
+    student_voice_name = row.get("Voice_Name", "en-GB-RyanNeural")
     
     st.markdown("---")
     
@@ -61,6 +92,11 @@ def render_simulator(df, cohort):
             st.rerun()
 
     with col2:
+        # --- RENDER SAFE AUDIO PLAYER ---
+        if "latest_audio_sim" in st.session_state:
+            st.audio(st.session_state["latest_audio_sim"], format="audio/mp3", autoplay=True)
+            del st.session_state["latest_audio_sim"]
+
         # 4. Chat History Initialization
         chat_key = f"chat_{selected_student}"
         if chat_key not in st.session_state:
@@ -104,15 +140,23 @@ def render_simulator(df, cohort):
             Keep your response short (1 to 3 sentences maximum) as a real teenager would.
             """
 
-            # Call the AI (Using the Pro model for deep emotional/behavioral nuance)
+            # Call the AI
             with st.spinner(f"{selected_student} is thinking..."):
                 try:
                     model = genai.GenerativeModel('gemini-3.5-flash')
                     response = model.generate_content(system_prompt)
                     
-                    # Save and show the student's response
-                    st.session_state[chat_key].append({"role": "assistant", "content": response.text})
-                    with st.chat_message("assistant"):
-                        st.write(response.text)
+                    # Save the student's text response
+                    reply_text = response.text
+                    st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
+                    
+                    # --- SAFE AUDIO TRIGGER ---
+                    audio_bytes = get_edge_audio(reply_text, student_voice_name)
+                    if audio_bytes is None:
+                        st.stop() # Freeze to read any errors!
+                    else:
+                        st.session_state["latest_audio_sim"] = audio_bytes
+                        st.rerun() # Refresh to show text and play audio simultaneously
+                        
                 except Exception as e:
                     st.error(f"API Error: {e}")
