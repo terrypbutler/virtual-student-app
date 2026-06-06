@@ -4,33 +4,39 @@ import json
 import time
 import random
 import re
-import requests
+import asyncio
+import edge_tts
+import tempfile
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
-# --- PUTER AI TTS ENGINE (UNLIMITED FREE) ---
-def get_puter_audio(text, voice_name="ara"):
-    """
-    Calls Puter's API directly for unlimited free text-to-speech.
-    Voices: 'eve', 'ara', 'rex', 'sal', 'leo'
-    """
-    url = "https://puter.com/api/ai/txt2speech"
+# --- MICROSOFT NEURAL TTS ENGINE (100% FREE & UNLIMITED) ---
+def get_edge_audio(text, voice_name="en-GB-RyanNeural"):
+    """Silently generates premium speech audio using Microsoft's free Neural voices."""
     
-    payload = {
-        "text": text,
-        "model": "xai",
-        "voice": voice_name if voice_name else "ara"
-    }
-    
+    # Fallback to Ryan if the spreadsheet cell is blank
+    if not voice_name or str(voice_name).upper() in ["NAN", "NONE", "", "N/A"]:
+        voice_name = "en-GB-RyanNeural"
+        
+    async def _generate():
+        communicate = edge_tts.Communicate(text, str(voice_name).strip())
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
+            temp_path = f.name
+        await communicate.save(temp_path)
+        return temp_path
+
     try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            return response.content
-        else:
-            st.error(f"Puter API Error: {response.status_code}")
-            return None
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        temp_file_path = loop.run_until_complete(_generate())
+        with open(temp_file_path, "rb") as audio_file:
+            return audio_file.read()
     except Exception as e:
-        st.error(f"Puter connection failed: {e}")
+        st.error(f"Failed to fetch Microsoft Neural audio: {e}")
         return None
 
 def get_flexible_text(row, possible_names):
@@ -271,8 +277,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
                             
-                            student_voice_name = target_row.get("Voice_Name", "ara")
-                            audio_bytes = get_puter_audio(reply.text, student_voice_name)
+                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                            audio_bytes = get_edge_audio(reply.text, student_voice_name)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -433,8 +439,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_name = target_row.get("Voice_Name", "ara")
-                            audio_bytes = get_puter_audio(student_reply, student_voice_name)
+                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                            audio_bytes = get_edge_audio(student_reply, student_voice_name)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -474,8 +480,8 @@ def render_academic_responses(df, cohort, subject="General"):
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
                                 
-                                student_voice_name = target_row.get("Voice_Name", "ara")
-                                audio_bytes = get_puter_audio(reply.text, student_voice_name)
+                                student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                                audio_bytes = get_edge_audio(reply.text, student_voice_name)
                                 if audio_bytes:
                                     st.session_state["latest_audio"] = audio_bytes
                                 st.rerun()
@@ -515,8 +521,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_name = target_row.get("Voice_Name", "ara")
-                            audio_bytes = get_puter_audio(student_reply, student_voice_name)
+                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                            audio_bytes = get_edge_audio(student_reply, student_voice_name)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -556,8 +562,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_name = target_row.get("Voice_Name", "ara")
-                            audio_bytes = get_puter_audio(reply.text, student_voice_name)
+                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                            audio_bytes = get_edge_audio(reply.text, student_voice_name)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
