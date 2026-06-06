@@ -8,38 +8,31 @@ import requests
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
-# --- FISH AI TTS ENGINE ---
-def get_fish_audio(text, fish_id):
-    """Silently generates speech audio using the Fish AI API."""
-    if "FISH_API_KEY" not in st.secrets:
-        st.error("⚠️ FISH_API_KEY missing in secrets.toml.")
-        return None
-
-    url = "https://api.fish.audio/v1/tts"
+def get_puter_audio(text, voice_name="ara"):
+    """
+    Calls Puter's API directly for unlimited free text-to-speech.
+    Voices: 'eve', 'ara', 'rex', 'sal', 'leo'
+    """
+    url = "https://puter.com/api/ai/txt2speech"
     
-    headers = {
-        "Authorization": f"Bearer {st.secrets['FISH_API_KEY']}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
+    # We define the payload exactly as the API expects
+    payload = {
         "text": text,
-        "format": "mp3",
-        "latency": "normal"
+        "model": "xai",
+        "voice": voice_name
     }
     
-    if fish_id and str(fish_id).upper() not in ["NAN", "NONE", "", "N/A"]:
-        data["reference_id"] = str(fish_id).strip()
-        
     try:
-        response = requests.post(url, json=data, headers=headers)
+        # Puter's API is designed for public access without complex auth headers
+        response = requests.post(url, json=payload)
+        
         if response.status_code == 200:
-            return response.content
+            return response.content  # Returns the audio bytes directly
         else:
-            st.error(f"Fish AI Error {response.status_code}: {response.text}")
+            st.error(f"Puter API Error: {response.status_code} - {response.text}")
             return None
     except Exception as e:
-        st.error(f"Failed to fetch Fish AI audio: {e}")
+        st.error(f"Puter connection failed: {e}")
         return None
 
 def get_flexible_text(row, possible_names):
