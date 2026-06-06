@@ -4,8 +4,44 @@ import json
 import time
 import random
 import re
+import requests
 from PIL import Image
 from modules.photo_utils import display_student_photo
+
+# --- FISH AI TTS ENGINE ---
+def get_fish_audio(text, fish_id):
+    """Silently generates speech audio using the Fish AI API."""
+    if "FISH_API_KEY" not in st.secrets:
+        st.error("⚠️ FISH_API_KEY missing in secrets.toml.")
+        return None
+
+    url = "https://api.fish.audio/v1/tts"
+    
+    headers = {
+        "Authorization": f"Bearer {st.secrets['FISH_API_KEY']}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "text": text,
+        "format": "mp3",
+        "latency": "normal"
+    }
+    
+    # If you mapped a specific Fish ID in your spreadsheet:
+    if fish_id and str(fish_id).upper() not in ["NAN", "NONE", "", "N/A"]:
+        data["reference_id"] = str(fish_id).strip()
+        
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 200:
+            return response.content
+        else:
+            st.error(f"Fish AI Error {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        st.error(f"Failed to fetch Fish AI audio: {e}")
+        return None
 
 def get_flexible_text(row, possible_names):
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
@@ -63,7 +99,6 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
         
         raw_ans = answers.get(name, "No response submitted.")
         
-        # Converts Markdown strikethrough (~~text~~) to HTML (<del>text</del>) for printing
         html_ans = re.sub(r'~~(.*?)~~', r'<del>\1</del>', str(raw_ans))
         html_ans = html_ans.replace("\n", "<br>")
 
@@ -198,7 +233,7 @@ def render_academic_responses(df, cohort, subject="General"):
             with col_a:
                 display_student_photo(target_name, cohort)
                 
-                # NATIVE STREAMLIT WHITEBOARD CONTAINER (Centered & Enlarged)
+                # NATIVE STREAMLIT WHITEBOARD CONTAINER
                 raw_ans = st.session_state.wb_answers.get(target_name, "?")
                 md_ans = str(raw_ans).replace("\n", "\n\n")
                 
@@ -243,6 +278,13 @@ def render_academic_responses(df, cohort, subject="General"):
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                            
+                            # --- FISH AI TRIGGER ---
+                            student_fish_id = target_row.get("Fish ID", None)
+                            audio_bytes = get_fish_audio(reply.text, student_fish_id)
+                            if audio_bytes:
+                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                                
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
@@ -278,6 +320,7 @@ def render_academic_responses(df, cohort, subject="General"):
                             display_student_photo(name, cohort)
                             st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                             
+                            # NATIVE STREAMLIT WHITEBOARD CONTAINER
                             raw_ans = st.session_state.wb_answers.get(name, "?")
                             md_ans = str(raw_ans).replace("\n", "\n\n")
                             
@@ -299,7 +342,6 @@ def render_academic_responses(df, cohort, subject="General"):
         if st.button("Collect Exit Tickets", type="primary"):
             with st.spinner("Students are writing their work (this may take a moment for a full class on the Pro model)..."):
                 
-                # --- NEW: Tiered Literacy Constraints ---
                 instructions = (
                     "Write EXACTLY what the student would write in their exercise book. "
                     "CRITICAL REALISM BY TARGET GRADE: You MUST scale the actual quality of the English, sentence structure, and vocabulary to their specific Target Grade.\n"
@@ -395,6 +437,14 @@ def render_academic_responses(df, cohort, subject="General"):
                             student_reply = answers.get(target_name, "...")
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
+                            
+                            # --- FISH AI TRIGGER ---
+                            target_row = df[df["Full Name"] == target_name].iloc[0]
+                            student_fish_id = target_row.get("Fish ID", None)
+                            audio_bytes = get_fish_audio(student_reply, student_fish_id)
+                            if audio_bytes:
+                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                                
                             st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
@@ -431,6 +481,14 @@ def render_academic_responses(df, cohort, subject="General"):
                             try:
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                                
+                                # --- FISH AI TRIGGER ---
+                                target_row = df[df["Full Name"] == target_name].iloc[0]
+                                student_fish_id = target_row.get("Fish ID", None)
+                                audio_bytes = get_fish_audio(reply.text, student_fish_id)
+                                if audio_bytes:
+                                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                                
                                 st.rerun()
                             except Exception as e:
                                 st.error("Failed to generate response.")
@@ -462,6 +520,14 @@ def render_academic_responses(df, cohort, subject="General"):
                             student_reply = answers.get(target_name, "...")
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
+                            
+                            # --- FISH AI TRIGGER ---
+                            target_row = df[df["Full Name"] == target_name].iloc[0]
+                            student_fish_id = target_row.get("Fish ID", None)
+                            audio_bytes = get_fish_audio(student_reply, student_fish_id)
+                            if audio_bytes:
+                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                                
                             st.rerun()
             else:
                 for msg in st.session_state[chat_key]:
@@ -497,6 +563,14 @@ def render_academic_responses(df, cohort, subject="General"):
                         try:
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                            
+                            # --- FISH AI TRIGGER ---
+                            target_row = df[df["Full Name"] == target_name].iloc[0]
+                            student_fish_id = target_row.get("Fish ID", None)
+                            audio_bytes = get_fish_audio(reply.text, student_fish_id)
+                            if audio_bytes:
+                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                            
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
