@@ -135,33 +135,39 @@ def render_simulator(df, cohort):
             {transcript}
             
             CRITICAL RULES FOR YOUR RESPONSE:
-            1. Output EXACTLY the spoken words the student says out loud and absolutely nothing else.
-            2. DO NOT include any stage directions, actions, emojis, or commentary (e.g., NEVER write *sighs*, [rolls eyes], or *shrugs*).
-            3. DO NOT start the response with the student's name (e.g., NEVER write "{selected_student}:").
-            4. Keep your response short (1 to 3 sentences maximum) as a real teenager would.
+            1. Include non-verbal communication, body language, and facial expressions to show your mood.
+            2. You MUST wrap ALL non-verbal actions in asterisks (e.g., *slumps in chair*, *avoids eye contact*).
+            3. Include your spoken dialogue normally alongside the actions.
+            4. DO NOT start the response with your name (e.g., NEVER write "{selected_student}:").
+            5. Keep your response short and realistic for a teenager.
             """
 
             # Call the AI
-            with st.spinner(f"{selected_student} is thinking..."):
+            with st.spinner(f"{selected_student} is reacting..."):
                 try:
                     import re
                     model = genai.GenerativeModel('gemini-3.5-flash')
                     response = model.generate_content(system_prompt)
                     
-                    # THE SCRUBBER: Force-removes any sneaky brackets, asterisks, or name prefixes just in case
-                    clean_reply = re.sub(r'[*\[(].*?[*\])]', '', response.text)
-                    clean_reply = clean_reply.replace(f"{selected_student}:", "").strip()
+                    # 1. THE DISPLAY TEXT: Keep the asterisks so the screen shows the italicized actions
+                    display_text = response.text.replace(f"{selected_student}:", "").strip()
                     
-                    # Save the cleaned student's text response
-                    st.session_state[chat_key].append({"role": "assistant", "content": clean_reply})
+                    # 2. THE AUDIO TEXT: Scrub out all stage directions just for the voice engine
+                    audio_text = re.sub(r'[*\[(].*?[*\])]', '', display_text).strip()
+                    
+                    # Save the FULL text (with actions) to the chat history so you can see it
+                    st.session_state[chat_key].append({"role": "assistant", "content": display_text})
                     
                     # --- SAFE AUDIO TRIGGER ---
-                    audio_bytes = get_edge_audio(clean_reply, student_voice_name)
-                    if audio_bytes is None:
-                        st.stop() # Freeze to read any errors!
-                    else:
-                        st.session_state["latest_audio_sim"] = audio_bytes
-                        st.rerun() # Refresh to show text and play audio simultaneously
+                    # Only trigger the voice engine if they actually spoke words out loud
+                    if audio_text:
+                        audio_bytes = get_edge_audio(audio_text, student_voice_name)
+                        if audio_bytes is None:
+                            st.stop() # Freeze to read any errors!
+                        else:
+                            st.session_state["latest_audio_sim"] = audio_bytes
+                            
+                    st.rerun() # Refresh to show text and play audio simultaneously
                         
                 except Exception as e:
                     st.error(f"API Error: {e}")
