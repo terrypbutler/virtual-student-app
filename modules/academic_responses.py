@@ -8,6 +8,7 @@ import requests
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
+# --- PUTER AI TTS ENGINE (UNLIMITED FREE) ---
 def get_puter_audio(text, voice_name="ara"):
     """
     Calls Puter's API directly for unlimited free text-to-speech.
@@ -15,21 +16,18 @@ def get_puter_audio(text, voice_name="ara"):
     """
     url = "https://puter.com/api/ai/txt2speech"
     
-    # We define the payload exactly as the API expects
     payload = {
         "text": text,
         "model": "xai",
-        "voice": voice_name
+        "voice": voice_name if voice_name else "ara"
     }
     
     try:
-        # Puter's API is designed for public access without complex auth headers
         response = requests.post(url, json=payload)
-        
         if response.status_code == 200:
-            return response.content  # Returns the audio bytes directly
+            return response.content
         else:
-            st.error(f"Puter API Error: {response.status_code} - {response.text}")
+            st.error(f"Puter API Error: {response.status_code}")
             return None
     except Exception as e:
         st.error(f"Puter connection failed: {e}")
@@ -235,7 +233,6 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.rerun()
                     
             with col_b:
-                # --- RENDER SAFE AUDIO PLAYER ---
                 if "latest_audio" in st.session_state:
                     st.audio(st.session_state["latest_audio"], format="audio/mp3", autoplay=True)
                     del st.session_state["latest_audio"]
@@ -274,14 +271,11 @@ def render_academic_responses(df, cohort, subject="General"):
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
                             
-                            # --- SAFE AUDIO TRIGGER ---
-                            student_fish_id = target_row.get("Fish ID", None)
-                            audio_bytes = get_fish_audio(reply.text, student_fish_id)
-                            if audio_bytes is None:
-                                st.stop() # Freeze to read the error!
-                            else:
+                            student_voice_name = target_row.get("Voice_Name", "ara")
+                            audio_bytes = get_puter_audio(reply.text, student_voice_name)
+                            if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
-                                st.rerun()
+                            st.rerun()
                                 
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
@@ -423,7 +417,6 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.rerun()
 
             with col_b:
-                # --- RENDER SAFE AUDIO PLAYER ---
                 if "latest_audio" in st.session_state:
                     st.audio(st.session_state["latest_audio"], format="audio/mp3", autoplay=True)
                     del st.session_state["latest_audio"]
@@ -439,15 +432,12 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
-                            # --- SAFE AUDIO TRIGGER ---
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_fish_id = target_row.get("Fish ID", None)
-                            audio_bytes = get_fish_audio(student_reply, student_fish_id)
-                            if audio_bytes is None:
-                                st.stop()
-                            else:
+                            student_voice_name = target_row.get("Voice_Name", "ara")
+                            audio_bytes = get_puter_audio(student_reply, student_voice_name)
+                            if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
-                                st.rerun()
+                            st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
                         msg_text = str(msg["content"]).replace("\n", "\n\n")
@@ -484,15 +474,11 @@ def render_academic_responses(df, cohort, subject="General"):
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
                                 
-                                # --- SAFE AUDIO TRIGGER ---
-                                target_row = df[df["Full Name"] == target_name].iloc[0]
-                                student_fish_id = target_row.get("Fish ID", None)
-                                audio_bytes = get_fish_audio(reply.text, student_fish_id)
-                                if audio_bytes is None:
-                                    st.stop()
-                                else:
+                                student_voice_name = target_row.get("Voice_Name", "ara")
+                                audio_bytes = get_puter_audio(reply.text, student_voice_name)
+                                if audio_bytes:
                                     st.session_state["latest_audio"] = audio_bytes
-                                    st.rerun()
+                                st.rerun()
                             except Exception as e:
                                 st.error("Failed to generate response.")
 
@@ -512,7 +498,6 @@ def render_academic_responses(df, cohort, subject="General"):
                 st.rerun()
                 
         with col2:
-            # --- RENDER SAFE AUDIO PLAYER ---
             if "latest_audio" in st.session_state:
                 st.audio(st.session_state["latest_audio"], format="audio/mp3", autoplay=True)
                 del st.session_state["latest_audio"]
@@ -529,15 +514,12 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
-                            # --- SAFE AUDIO TRIGGER ---
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_fish_id = target_row.get("Fish ID", None)
-                            audio_bytes = get_fish_audio(student_reply, student_fish_id)
-                            if audio_bytes is None:
-                                st.stop()
-                            else:
+                            student_voice_name = target_row.get("Voice_Name", "ara")
+                            audio_bytes = get_puter_audio(student_reply, student_voice_name)
+                            if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
-                                st.rerun()
+                            st.rerun()
             else:
                 for msg in st.session_state[chat_key]:
                     msg_text = str(msg["content"]).replace("\n", "\n\n")
@@ -573,14 +555,11 @@ def render_academic_responses(df, cohort, subject="General"):
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
                             
-                            # --- SAFE AUDIO TRIGGER ---
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_fish_id = target_row.get("Fish ID", None)
-                            audio_bytes = get_fish_audio(reply.text, student_fish_id)
-                            if audio_bytes is None:
-                                st.stop()
-                            else:
+                            student_voice_name = target_row.get("Voice_Name", "ara")
+                            audio_bytes = get_puter_audio(reply.text, student_voice_name)
+                            if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
-                                st.rerun()
+                            st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
