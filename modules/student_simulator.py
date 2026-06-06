@@ -119,7 +119,7 @@ def render_simulator(df, cohort):
             # Build the continuous transcript so the AI remembers the conversation!
             transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
-            # Build the invisible System Prompt
+# Build the invisible System Prompt
             system_prompt = f"""
             You are roleplaying as a {age}-year-old UK secondary school student named {selected_student}.
             Here is your background data:
@@ -134,24 +134,29 @@ def render_simulator(df, cohort):
             Here is the conversation transcript so far:
             {transcript}
             
-            Respond to the teacher's last statement as {selected_student}. 
-            Respond exactly how a student with your profile would respond. 
-            Do NOT break character. Do NOT be overly polite if your profile suggests behavior issues.
-            Keep your response short (1 to 3 sentences maximum) as a real teenager would.
+            CRITICAL RULES FOR YOUR RESPONSE:
+            1. Output EXACTLY the spoken words the student says out loud and absolutely nothing else.
+            2. DO NOT include any stage directions, actions, emojis, or commentary (e.g., NEVER write *sighs*, [rolls eyes], or *shrugs*).
+            3. DO NOT start the response with the student's name (e.g., NEVER write "{selected_student}:").
+            4. Keep your response short (1 to 3 sentences maximum) as a real teenager would.
             """
 
             # Call the AI
             with st.spinner(f"{selected_student} is thinking..."):
                 try:
+                    import re
                     model = genai.GenerativeModel('gemini-3.5-flash')
                     response = model.generate_content(system_prompt)
                     
-                    # Save the student's text response
-                    reply_text = response.text
-                    st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
+                    # THE SCRUBBER: Force-removes any sneaky brackets, asterisks, or name prefixes just in case
+                    clean_reply = re.sub(r'[*\[(].*?[*\])]', '', response.text)
+                    clean_reply = clean_reply.replace(f"{selected_student}:", "").strip()
+                    
+                    # Save the cleaned student's text response
+                    st.session_state[chat_key].append({"role": "assistant", "content": clean_reply})
                     
                     # --- SAFE AUDIO TRIGGER ---
-                    audio_bytes = get_edge_audio(reply_text, student_voice_name)
+                    audio_bytes = get_edge_audio(clean_reply, student_voice_name)
                     if audio_bytes is None:
                         st.stop() # Freeze to read any errors!
                     else:
