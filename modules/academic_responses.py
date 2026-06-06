@@ -28,7 +28,6 @@ def get_fish_audio(text, fish_id):
         "latency": "normal"
     }
     
-    # If you mapped a specific Fish ID in your spreadsheet:
     if fish_id and str(fish_id).upper() not in ["NAN", "NONE", "", "N/A"]:
         data["reference_id"] = str(fish_id).strip()
         
@@ -168,7 +167,6 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
                 
             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
             
-            # COPY-PASTE SAFE JSON EXTRACTION
             raw_text = response.text
             raw_text = raw_text.replace("`" * 3 + "json", "")
             raw_text = raw_text.replace("`" * 3, "")
@@ -233,7 +231,6 @@ def render_academic_responses(df, cohort, subject="General"):
             with col_a:
                 display_student_photo(target_name, cohort)
                 
-                # NATIVE STREAMLIT WHITEBOARD CONTAINER
                 raw_ans = st.session_state.wb_answers.get(target_name, "?")
                 md_ans = str(raw_ans).replace("\n", "\n\n")
                 
@@ -245,6 +242,11 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.rerun()
                     
             with col_b:
+                # --- RENDER SAFE AUDIO PLAYER ---
+                if "latest_audio" in st.session_state:
+                    st.audio(st.session_state["latest_audio"], format="audio/mp3", autoplay=True)
+                    del st.session_state["latest_audio"]
+                    
                 for msg in st.session_state[chat_key]:
                     msg_text = str(msg["content"]).replace("\n", "\n\n")
                     if msg["role"] == "teacher":
@@ -279,13 +281,15 @@ def render_academic_responses(df, cohort, subject="General"):
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
                             
-                            # --- FISH AI TRIGGER ---
+                            # --- SAFE AUDIO TRIGGER ---
                             student_fish_id = target_row.get("Fish ID", None)
                             audio_bytes = get_fish_audio(reply.text, student_fish_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                            if audio_bytes is None:
+                                st.stop() # Freeze to read the error!
+                            else:
+                                st.session_state["latest_audio"] = audio_bytes
+                                st.rerun()
                                 
-                            st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
                             
@@ -320,7 +324,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             display_student_photo(name, cohort)
                             st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 13px; margin: 4px 0;'>{name}</div>", unsafe_allow_html=True)
                             
-                            # NATIVE STREAMLIT WHITEBOARD CONTAINER
                             raw_ans = st.session_state.wb_answers.get(name, "?")
                             md_ans = str(raw_ans).replace("\n", "\n\n")
                             
@@ -427,6 +430,11 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.rerun()
 
             with col_b:
+                # --- RENDER SAFE AUDIO PLAYER ---
+                if "latest_audio" in st.session_state:
+                    st.audio(st.session_state["latest_audio"], format="audio/mp3", autoplay=True)
+                    del st.session_state["latest_audio"]
+                    
                 if len(st.session_state[chat_key]) == 0:
                     with st.spinner(f"Waiting for {target_name} to respond..."):
                         target_df = df[df["Full Name"] == target_name]
@@ -438,14 +446,15 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
-                            # --- FISH AI TRIGGER ---
+                            # --- SAFE AUDIO TRIGGER ---
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             student_fish_id = target_row.get("Fish ID", None)
                             audio_bytes = get_fish_audio(student_reply, student_fish_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                                
-                            st.rerun()
+                            if audio_bytes is None:
+                                st.stop()
+                            else:
+                                st.session_state["latest_audio"] = audio_bytes
+                                st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
                         msg_text = str(msg["content"]).replace("\n", "\n\n")
@@ -482,14 +491,15 @@ def render_academic_responses(df, cohort, subject="General"):
                                 reply = model.generate_content(chat_prompt)
                                 st.session_state[chat_key].append({"role": "student", "content": reply.text})
                                 
-                                # --- FISH AI TRIGGER ---
+                                # --- SAFE AUDIO TRIGGER ---
                                 target_row = df[df["Full Name"] == target_name].iloc[0]
                                 student_fish_id = target_row.get("Fish ID", None)
                                 audio_bytes = get_fish_audio(reply.text, student_fish_id)
-                                if audio_bytes:
-                                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                                
-                                st.rerun()
+                                if audio_bytes is None:
+                                    st.stop()
+                                else:
+                                    st.session_state["latest_audio"] = audio_bytes
+                                    st.rerun()
                             except Exception as e:
                                 st.error("Failed to generate response.")
 
@@ -509,6 +519,11 @@ def render_academic_responses(df, cohort, subject="General"):
                 st.rerun()
                 
         with col2:
+            # --- RENDER SAFE AUDIO PLAYER ---
+            if "latest_audio" in st.session_state:
+                st.audio(st.session_state["latest_audio"], format="audio/mp3", autoplay=True)
+                del st.session_state["latest_audio"]
+                
             if len(st.session_state[chat_key]) == 0:
                 if st.button(f"🗣️ Ask {target_name} the opening question", type="primary"):
                     with st.spinner(f"Waiting for {target_name} to respond..."):
@@ -521,14 +536,15 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "teacher", "content": teacher_question})
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
-                            # --- FISH AI TRIGGER ---
+                            # --- SAFE AUDIO TRIGGER ---
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             student_fish_id = target_row.get("Fish ID", None)
                             audio_bytes = get_fish_audio(student_reply, student_fish_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                                
-                            st.rerun()
+                            if audio_bytes is None:
+                                st.stop()
+                            else:
+                                st.session_state["latest_audio"] = audio_bytes
+                                st.rerun()
             else:
                 for msg in st.session_state[chat_key]:
                     msg_text = str(msg["content"]).replace("\n", "\n\n")
@@ -564,13 +580,14 @@ def render_academic_responses(df, cohort, subject="General"):
                             reply = model.generate_content(chat_prompt)
                             st.session_state[chat_key].append({"role": "student", "content": reply.text})
                             
-                            # --- FISH AI TRIGGER ---
+                            # --- SAFE AUDIO TRIGGER ---
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             student_fish_id = target_row.get("Fish ID", None)
                             audio_bytes = get_fish_audio(reply.text, student_fish_id)
-                            if audio_bytes:
-                                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                            
-                            st.rerun()
+                            if audio_bytes is None:
+                                st.stop()
+                            else:
+                                st.session_state["latest_audio"] = audio_bytes
+                                st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
