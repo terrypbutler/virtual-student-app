@@ -1,45 +1,70 @@
 import streamlit as st
 import google.generativeai as genai
+import azure.cognitiveservices.speech as speechsdk
 import json
 import time
 import random
 import re
-import asyncio
-import edge_tts
-import tempfile
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
-# --- MICROSOFT NEURAL TTS ENGINE (100% FREE & UNLIMITED) ---
-def get_edge_audio(text, voice_name="en-GB-RyanNeural"):
-    """Silently generates premium speech audio using Microsoft's free Neural voices."""
-    
-    # Fallback to Ryan if the spreadsheet cell is blank
-    if not voice_name or str(voice_name).upper() in ["NAN", "NONE", "", "N/A"]:
-        voice_name = "en-GB-RyanNeural"
-        
-    async def _generate():
-        communicate = edge_tts.Communicate(text, str(voice_name).strip())
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
-            temp_path = f.name
-        await communicate.save(temp_path)
-        return temp_path
-
-    try:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-        temp_file_path = loop.run_until_complete(_generate())
-        with open(temp_file_path, "rb") as audio_file:
-            return audio_file.read()
-    except Exception as e:
-        st.error(f"Failed to fetch Microsoft Neural audio: {e}")
+# --- OFFICIAL AZURE TTS ENGINE ---
+def get_azure_audio(text, voice_name="en-GB-RyanNeural", pitch="+0%", rate="+0%"):
+    """Generates audio using the official Azure SDK with SSML for pitch/rate control."""
+    if "AZURE_SPEECH_KEY" not in st.secrets or "AZURE_SPEECH_REGION" not in st.secrets:
+        st.error("⚠️ Azure Speech Key or Region missing in secrets.toml.")
         return None
 
-def get_flexible_text(row, possible_names):
+    if not voice_name or str(voice_name).upper() in ["NAN", "NONE", "", "N/A"]:
+        voice_name = "en-GB-RyanNeural"
+
+    # Set up the Azure configuration
+    speech_config = speechsdk.SpeechConfig(
+        subscription=st.secrets["AZURE_SPEECH_KEY"], 
+        region=st.secrets["AZURE_SPEECH_REGION"]
+    )
+    
+    # We want to get the audio bytes back, not play it directly on the server speaker
+    audio_config = speechsdk.audio.PullAudioOutputStream()
+    stream_config = speechsdk.audio.AudioOutputConfig(stream=audio_config)
+    
+    # Ensure audio format is standard for web players (e.g., MP3 or WAV)
+    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3)
+    
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=stream_config)
+
+    # Convert generic pitch (e.g., "+10Hz" or "+10%") to SSML percentage format
+    # Azure SSML prefers relative percentages for pitch
+    clean_pitch = pitch.replace("Hz", "%") 
+    
+    # Build the SSML (Speech Synthesis Markup Language) string
+    ssml_string = f"""
+    <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">
+        <voice name="{voice_name}">
+            <prosody pitch="{clean_pitch}" rate="{rate}">
+                {text}
+            </prosody>
+        </voice>
+    </speak>
+    """
+
+    try:
+        # Generate the audio
+        result = synthesizer.speak_ssml_async(ssml_string).get()
+        
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            return result.audio_data
+        elif result.reason == speechsdk.ResultReason.Canceled:
+            cancellation_details = result.cancellation_details
+            st.error(f"Azure Speech Cancelled: {cancellation_details.reason}")
+            if cancellation_details.reason == speechsdk.CancellationReason.Error:
+                st.error(f"Azure Error Details: {cancellation_details.error_details}")
+            return None
+    except Exception as e:
+        st.error(f"Failed to fetch Azure audio: {e}")
+        return None
+
+def get_flexible_text(row, possible_names, default="None recorded"):
     row_keys = {str(k).strip().lower(): k for k in row.keys()}
     for name in possible_names:
         clean_name = name.lower().strip()
@@ -48,69 +73,29 @@ def get_flexible_text(row, possible_names):
             if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
                 if val.endswith(".0"): val = val[:-2]
                 return val
-    return "Unknown"
+    return default
 
-def create_printable_worksheet(question, answers, df, subject, cohort):
-    html = [
-        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Marking Practice</title>",
-        "<script src='https://polyfill.io/v3/polyfill.min.js?features=es6'></script>",
-        "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
-        "<style>",
-        "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #222; line-height: 1.5; }",
-        "@media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .student-box { page-break-inside: avoid; } }",
-        ".header { text-align: center; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px; }",
-        ".reflection-box { background: #e8f4f8; border: 2px solid #3498DB; padding: 20px; margin-bottom: 30px; border-radius: 8px; }",
-        ".reflection-box h3 { margin-top: 0; color: #2C3E50; font-size: 18px; }",
-        ".reflection-box ul { margin: 0; padding-left: 20px; font-weight: bold; color: #333; font-size: 15px; }",
-        ".reflection-box li { margin-bottom: 6px; }",
-        ".question-box { background: #f8f9fa; padding: 15px; border-left: 5px solid #E67E22; margin-bottom: 30px; font-size: 16px; }",
-        ".student-box { border: 2px solid #ddd; padding: 20px; margin-bottom: 25px; border-radius: 8px; }",
-        ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
-        ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
-        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; }",
-        "del { color: #d9534f; text-decoration: line-through; }", 
-        ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
-        ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
-        "</style></head><body>",
-        f"<div class='header'><h2>ITT Marking Practice: {cohort} {subject}</h2></div>",
-        "<div class='reflection-box'>",
-        "<h3>Trainee Reflection Prompts:</h3>",
-        "<ul>",
-        "<li>Who understands the problem but still loses marks?</li>",
-        "<li>Who doesn’t finish — and why?</li>",
-        "<li>Which responses would collapse under exam conditions?</li>",
-        "<li>If this was your class, what would you do now?</li>",
-        "<li>Who needs scaffolding not stretch?</li>",
-        "<li>Who needs slowing down not challenge?</li>",
-        "<li>Who needs feedback on presentation, not maths?</li>",
-        "</ul>",
-        "</div>",
-        f"<div class='question-box'><strong>Teacher's Prompt / Exit Ticket Question:</strong><br><br>{question}</div>"
-    ]
-
-    for _, row in df.iterrows():
-        name = row.get("Full Name", "Unknown")
-        grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
-        sen = get_flexible_text(row, ["SEN Status", "SEND Status"])
+def calculate_emotion_modifiers(base_pitch, base_rate, emotion):
+    """Dynamically alters the voice based on the AI-determined mood."""
+    try: bp_val = int(base_pitch.replace("Hz", "").replace("%", "").replace("+", ""))
+    except: bp_val = 0
+    try: br_val = int(base_rate.replace("%", "").replace("+", ""))
+    except: br_val = 0
+    
+    if emotion == "angry" or emotion == "defensive":
+        br_val += 15 
+        bp_val -= 5   
+    elif emotion == "sad" or emotion == "bored" or emotion == "hesitant":
+        br_val -= 20  
+        bp_val -= 10  
+    elif emotion == "excited" or emotion == "eager":
+        br_val += 10  
+        bp_val += 15  
         
-        raw_ans = answers.get(name, "No response submitted.")
-        
-        html_ans = re.sub(r'~~(.*?)~~', r'<del>\1</del>', str(raw_ans))
-        html_ans = html_ans.replace("\n", "<br>")
-
-        profile_text = f"Target: {grade}"
-        if sen and sen.upper() not in ["N/A", "NONE", "NO", "N", ""]:
-            profile_text += f" | SEN: {sen}"
-
-        html.append(f"<div class='student-box'>")
-        html.append(f"<div class='student-name'>{name}</div>")
-        html.append(f"<div class='student-profile'>Context for Trainee: {profile_text}</div>")
-        html.append(f"<div class='student-answer'>{html_ans}</div>")
-        html.append(f"<div class='marking-area'><span class='marking-title'>Trainee Feedback / Next Steps:</span></div>")
-        html.append(f"</div>")
-
-    html.append("</body></html>")
-    return "\n".join(html)
+    final_pitch = f"+{bp_val}%" if bp_val >= 0 else f"{bp_val}%"
+    final_rate = f"+{br_val}%" if br_val >= 0 else f"{br_val}%"
+    
+    return final_pitch, final_rate
 
 def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject, teacher_name, is_written=False):
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
@@ -177,6 +162,68 @@ def fetch_ai_answers(question, student_subset, instructions, uploaded_file, coho
                 st.error("🚦 AI exhausted. Please wait 60 seconds.")
                 return {}
     return {}
+
+def create_printable_worksheet(question, answers, df, subject, cohort):
+    html = [
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Marking Practice</title>",
+        "<script src='https://polyfill.io/v3/polyfill.min.js?features=es6'></script>",
+        "<script id='MathJax-script' async src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'></script>",
+        "<style>",
+        "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #222; line-height: 1.5; }",
+        "@media print { body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .student-box { page-break-inside: avoid; } }",
+        ".header { text-align: center; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px; }",
+        ".reflection-box { background: #e8f4f8; border: 2px solid #3498DB; padding: 20px; margin-bottom: 30px; border-radius: 8px; }",
+        ".reflection-box h3 { margin-top: 0; color: #2C3E50; font-size: 18px; }",
+        ".reflection-box ul { margin: 0; padding-left: 20px; font-weight: bold; color: #333; font-size: 15px; }",
+        ".reflection-box li { margin-bottom: 6px; }",
+        ".question-box { background: #f8f9fa; padding: 15px; border-left: 5px solid #E67E22; margin-bottom: 30px; font-size: 16px; }",
+        ".student-box { border: 2px solid #ddd; padding: 20px; margin-bottom: 25px; border-radius: 8px; }",
+        ".student-name { font-size: 18px; font-weight: bold; color: #2C3E50; margin-bottom: 4px; }",
+        ".student-profile { font-size: 12px; color: #666; margin-bottom: 12px; background: #eee; display: inline-block; padding: 3px 8px; border-radius: 4px; }",
+        ".student-answer { font-size: 15px; margin-bottom: 30px; line-height: 1.6; font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; color: #000080; }",
+        "del { color: #d9534f; text-decoration: line-through; }", 
+        ".marking-area { border-top: 2px dashed #ccc; padding-top: 15px; min-height: 120px; }",
+        ".marking-title { font-weight: bold; font-size: 14px; color: #E67E22; text-transform: uppercase; letter-spacing: 1px; }",
+        "</style></head><body>",
+        f"<div class='header'><h2>ITT Marking Practice: {cohort} {subject}</h2></div>",
+        "<div class='reflection-box'>",
+        "<h3>Trainee Reflection Prompts:</h3>",
+        "<ul>",
+        "<li>Who understands the problem but still loses marks?</li>",
+        "<li>Who doesn’t finish — and why?</li>",
+        "<li>Which responses would collapse under exam conditions?</li>",
+        "<li>If this was your class, what would you do now?</li>",
+        "<li>Who needs scaffolding not stretch?</li>",
+        "<li>Who needs slowing down not challenge?</li>",
+        "<li>Who needs feedback on presentation, not maths?</li>",
+        "</ul>",
+        "</div>",
+        f"<div class='question-box'><strong>Teacher's Prompt / Exit Ticket Question:</strong><br><br>{question}</div>"
+    ]
+
+    for _, row in df.iterrows():
+        name = row.get("Full Name", "Unknown")
+        grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
+        sen = get_flexible_text(row, ["SEN Status", "SEND Status"])
+        
+        raw_ans = answers.get(name, "No response submitted.")
+        
+        html_ans = re.sub(r'~~(.*?)~~', r'<del>\1</del>', str(raw_ans))
+        html_ans = html_ans.replace("\n", "<br>")
+
+        profile_text = f"Target: {grade}"
+        if sen and sen.upper() not in ["N/A", "NONE", "NO", "N", ""]:
+            profile_text += f" | SEN: {sen}"
+
+        html.append(f"<div class='student-box'>")
+        html.append(f"<div class='student-name'>{name}</div>")
+        html.append(f"<div class='student-profile'>Context for Trainee: {profile_text}</div>")
+        html.append(f"<div class='student-answer'>{html_ans}</div>")
+        html.append(f"<div class='marking-area'><span class='marking-title'>Trainee Feedback / Next Steps:</span></div>")
+        html.append(f"</div>")
+
+    html.append("</body></html>")
+    return "\n".join(html)
 
 def render_academic_responses(df, cohort, subject="General"):
     st.subheader(f"🎓 AfL Simulator: {subject} Questioning")
@@ -255,10 +302,15 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
                     with st.chat_message("user"): st.markdown(follow_up)
                     
-                    with st.spinner(f"{target_name} is thinking..."):
+                    with st.spinner(f"{target_name} is reacting..."):
                         target_row = df[df["Full Name"] == target_name].iloc[0]
                         target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                         target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
+                        
+                        student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                        base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
+                        base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
+                        
                         transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
                         
                         chat_prompt = f"""
@@ -268,17 +320,29 @@ def render_academic_responses(df, cohort, subject="General"):
                         Here is the conversation so far. Note that your first response was a written answer on a mini-whiteboard:
                         {transcript}
                         
-                        Respond verbally to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. 
-                        You may naturally address the teacher as {teacher_name}. NO commentary.
+                        CRITICAL RULES:
+                        1. Respond verbally to the teacher's last question as {target_name}. Keep it brief. 
+                        2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].
+                        3. You MUST return your response as a raw JSON object with two keys: "dialogue" and "emotion".
+                        
+                        Example Format:
+                        {{"dialogue": "I think it's 4, {teacher_name}", "emotion": "hesitant"}}
                         """
                         
-                        model = genai.GenerativeModel('gemini-2.5-pro')
                         try:
-                            reply = model.generate_content(chat_prompt)
-                            st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                            model = genai.GenerativeModel('gemini-2.5-pro')
+                            response = model.generate_content(chat_prompt, generation_config={"response_mime_type": "application/json"})
                             
-                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            audio_bytes = get_edge_audio(reply.text, student_voice_name)
+                            ai_data = json.loads(response.text)
+                            reply_text = ai_data.get("dialogue", "...")
+                            current_emotion = ai_data.get("emotion", "neutral")
+                            
+                            st.session_state[chat_key].append({"role": "student", "content": reply_text})
+                            
+                            active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
+                            st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
+                            
+                            audio_bytes = get_azure_audio(reply_text, student_voice_name, pitch=active_pitch, rate=active_rate)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -440,7 +504,10 @@ def render_academic_responses(df, cohort, subject="General"):
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            audio_bytes = get_edge_audio(student_reply, student_voice_name)
+                            base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
+                            base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
+                            
+                            audio_bytes = get_azure_audio(student_reply, student_voice_name, pitch=base_pitch, rate=base_rate)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -457,10 +524,15 @@ def render_academic_responses(df, cohort, subject="General"):
                         st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
                         with st.chat_message("user"): st.markdown(follow_up)
                         
-                        with st.spinner(f"{target_name} is thinking..."):
+                        with st.spinner(f"{target_name} is reacting..."):
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                             target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
+                            
+                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                            base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
+                            base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
+                            
                             transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
 
                             chat_prompt = f"""
@@ -470,21 +542,34 @@ def render_academic_responses(df, cohort, subject="General"):
                             Here is the conversation so far:
                             {transcript}
 
-                            Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
-                            If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. 
-                            You may naturally address the teacher as {teacher_name}. Do not include commentary.
+                            CRITICAL RULES:
+                            1. Respond to the teacher's last question as {target_name}. Keep it brief (1-2 sentences). 
+                            2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].
+                            3. You MUST return your response as a raw JSON object with two keys: "dialogue" and "emotion".
+                            
+                            Example Format:
+                            {{"dialogue": "I think it's 4, {teacher_name}", "emotion": "hesitant"}}
                             """
                             
-                            model = genai.GenerativeModel('gemini-2.5-pro')
                             try:
-                                reply = model.generate_content(chat_prompt)
-                                st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                                model = genai.GenerativeModel('gemini-2.5-pro')
+                                response = model.generate_content(chat_prompt, generation_config={"response_mime_type": "application/json"})
                                 
-                                student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                                audio_bytes = get_edge_audio(reply.text, student_voice_name)
-                                if audio_bytes:
+                                ai_data = json.loads(response.text)
+                                reply_text = ai_data.get("dialogue", "...")
+                                current_emotion = ai_data.get("emotion", "neutral")
+                                
+                                st.session_state[chat_key].append({"role": "student", "content": reply_text})
+                                
+                                active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
+                                st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
+                                
+                                audio_bytes = get_azure_audio(reply_text, student_voice_name, pitch=active_pitch, rate=active_rate)
+                                if audio_bytes is None:
+                                    st.stop()
+                                else:
                                     st.session_state["latest_audio"] = audio_bytes
-                                st.rerun()
+                                    st.rerun()
                             except Exception as e:
                                 st.error("Failed to generate response.")
 
@@ -522,7 +607,10 @@ def render_academic_responses(df, cohort, subject="General"):
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            audio_bytes = get_edge_audio(student_reply, student_voice_name)
+                            base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
+                            base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
+                            
+                            audio_bytes = get_azure_audio(student_reply, student_voice_name, pitch=base_pitch, rate=base_rate)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -539,10 +627,15 @@ def render_academic_responses(df, cohort, subject="General"):
                     st.session_state[chat_key].append({"role": "teacher", "content": follow_up})
                     with st.chat_message("user"): st.markdown(follow_up)
                     
-                    with st.spinner(f"{target_name} is thinking..."):
+                    with st.spinner(f"{target_name} is reacting..."):
                         target_row = df[df["Full Name"] == target_name].iloc[0]
                         target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                         target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
+                        
+                        student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
+                        base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
+                        base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
+                        
                         transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
                         
                         chat_prompt = f"""
@@ -552,20 +645,34 @@ def render_academic_responses(df, cohort, subject="General"):
                         Here is the conversation so far:
                         {transcript}
                         
-                        Respond to the teacher's last question as {target_name}. Keep it brief. If the teacher has successfully guided you to the right answer, show realization. If their hint was confusing, stay confused. 
-                        You may naturally address the teacher as {teacher_name}. NO commentary.
+                        CRITICAL RULES:
+                        1. Respond to the teacher's last question as {target_name}. Keep it brief. 
+                        2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].
+                        3. You MUST return your response as a raw JSON object with two keys: "dialogue" and "emotion".
+                        
+                        Example Format:
+                        {{"dialogue": "I think it's 4, {teacher_name}", "emotion": "hesitant"}}
                         """
                         
-                        model = genai.GenerativeModel('gemini-2.5-pro')
                         try:
-                            reply = model.generate_content(chat_prompt)
-                            st.session_state[chat_key].append({"role": "student", "content": reply.text})
+                            model = genai.GenerativeModel('gemini-2.5-pro')
+                            response = model.generate_content(chat_prompt, generation_config={"response_mime_type": "application/json"})
                             
-                            target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            audio_bytes = get_edge_audio(reply.text, student_voice_name)
-                            if audio_bytes:
+                            ai_data = json.loads(response.text)
+                            reply_text = ai_data.get("dialogue", "...")
+                            current_emotion = ai_data.get("emotion", "neutral")
+                            
+                            st.session_state[chat_key].append({"role": "student", "content": reply_text})
+                            
+                            active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
+                            st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
+                            
+                            audio_bytes = get_azure_audio(reply_text, student_voice_name, pitch=active_pitch, rate=active_rate)
+                            if audio_bytes is None:
+                                st.stop()
+                            else:
                                 st.session_state["latest_audio"] = audio_bytes
-                            st.rerun()
+                                st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
+                    
