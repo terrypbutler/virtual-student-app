@@ -8,95 +8,31 @@ import re
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
-# --- OFFICIAL AZURE TTS ENGINE ---
-def get_azure_audio(text, voice_name="en-GB-RyanNeural", pitch="+0%", rate="+0%"):
-    """Generates audio using the official Azure SDK with SSML for pitch/rate control."""
-    if "AZURE_SPEECH_KEY" not in st.secrets or "AZURE_SPEECH_REGION" not in st.secrets:
-        st.error("⚠️ Azure Speech Key or Region missing in secrets.toml.")
-        return None
+from elevenlabs.client import ElevenLabs
+import streamlit as st
 
-    if not voice_name or str(voice_name).upper() in ["NAN", "NONE", "", "N/A"]:
-        voice_name = "en-GB-RyanNeural"
-
-    # Set up the Azure configuration
-    speech_config = speechsdk.SpeechConfig(
-        subscription=st.secrets["AZURE_SPEECH_KEY"], 
-        region=st.secrets["AZURE_SPEECH_REGION"]
-    )
-    
-    # We want to get the audio bytes back, not play it directly on the server speaker
-    audio_config = speechsdk.audio.PullAudioOutputStream()
-    stream_config = speechsdk.audio.AudioOutputConfig(stream=audio_config)
-    
-    # Ensure audio format is standard for web players (e.g., MP3 or WAV)
-    speech_config.set_speech_synthesis_output_format(speechsdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3)
-    
-    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=stream_config)
-
-    # Convert generic pitch (e.g., "+10Hz" or "+10%") to SSML percentage format
-    # Azure SSML prefers relative percentages for pitch
-    clean_pitch = pitch.replace("Hz", "%") 
-    
-    # Build the SSML (Speech Synthesis Markup Language) string
-    ssml_string = f"""
-    <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">
-        <voice name="{voice_name}">
-            <prosody pitch="{clean_pitch}" rate="{rate}">
-                {text}
-            </prosody>
-        </voice>
-    </speak>
+def get_elevenlabs_audio(text, voice_id="JBFqnCBsd6RMkjVDRZzb"):
     """
-
-    try:
-        # Generate the audio
-        result = synthesizer.speak_ssml_async(ssml_string).get()
-        
-        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
-            return result.audio_data
-        elif result.reason == speechsdk.ResultReason.Canceled:
-            cancellation_details = result.cancellation_details
-            st.error(f"Azure Speech Cancelled: {cancellation_details.reason}")
-            if cancellation_details.reason == speechsdk.CancellationReason.Error:
-                st.error(f"Azure Error Details: {cancellation_details.error_details}")
-            return None
-    except Exception as e:
-        st.error(f"Failed to fetch Azure audio: {e}")
+    Generates premium audio using ElevenLabs.
+    voice_id: The unique ID from your ElevenLabs Voice Library.
+    """
+    if "ELEVENLABS_API_KEY" not in st.secrets:
+        st.error("⚠️ ELEVENLABS_API_KEY missing.")
         return None
-
-def get_flexible_text(row, possible_names, default="None recorded"):
-    row_keys = {str(k).strip().lower(): k for k in row.keys()}
-    for name in possible_names:
-        clean_name = name.lower().strip()
-        if clean_name in row_keys:
-            val = str(row[row_keys[clean_name]]).strip()
-            if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
-                if val.endswith(".0"): val = val[:-2]
-                return val
-    return default
-
-def calculate_emotion_modifiers(base_pitch, base_rate, emotion):
-    """Dynamically alters the voice based on the AI-determined mood."""
-    try: bp_val = int(base_pitch.replace("Hz", "").replace("%", "").replace("+", ""))
-    except: bp_val = 0
-    try: br_val = int(base_rate.replace("%", "").replace("+", ""))
-    except: br_val = 0
-    
-    if emotion == "angry" or emotion == "defensive":
-        br_val += 15 
-        bp_val -= 5   
-    elif emotion == "sad" or emotion == "bored" or emotion == "hesitant":
-        br_val -= 20  
-        bp_val -= 10  
-    elif emotion == "excited" or emotion == "eager":
-        br_val += 10  
-        bp_val += 15  
         
-    final_pitch = f"+{bp_val}%" if bp_val >= 0 else f"{bp_val}%"
-    final_rate = f"+{br_val}%" if br_val >= 0 else f"{br_val}%"
-    
-    return final_pitch, final_rate
-
+    try:
+        client = ElevenLabs(api_key=st.secrets["ELEVENLABS_API_KEY"])
+        audio_generator = client.generate(
+            text=text,
+            voice=voice_id,
+            model="eleven_turbo_v2_5" # Fast, high-quality model
+        )
+        # Combine the generator stream into bytes
+        audio_bytes = b"".join(audio_generator)
+        return audio_bytes
+    except Exception as e:
+        st.error(f"ElevenLabs Error: {e}")
+        return None
 def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject, teacher_name, is_written=False):
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
     
