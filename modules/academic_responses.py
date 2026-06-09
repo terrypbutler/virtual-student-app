@@ -11,9 +11,12 @@ from modules.photo_utils import display_student_photo
 from elevenlabs.client import ElevenLabs
 import streamlit as st
 
+from elevenlabs.client import ElevenLabs
+import streamlit as st
+
 def get_elevenlabs_audio(text, voice_id="JBFqnCBsd6RMkjVDRZzb"):
     """
-    Generates premium audio using ElevenLabs.
+    Generates premium audio using the modern ElevenLabs v1.0+ SDK.
     voice_id: The unique ID from your ElevenLabs Voice Library.
     """
     if "ELEVENLABS_API_KEY" not in st.secrets:
@@ -21,15 +24,20 @@ def get_elevenlabs_audio(text, voice_id="JBFqnCBsd6RMkjVDRZzb"):
         return None
         
     try:
+        # Initialize the modern client
         client = ElevenLabs(api_key=st.secrets["ELEVENLABS_API_KEY"])
-        audio_generator = client.generate(
+        
+        # The new syntax for generating speech
+        audio_generator = client.text_to_speech.convert(
             text=text,
-            voice=voice_id,
-            model="eleven_turbo_v2_5" # Fast, high-quality model
+            voice_id=voice_id,
+            model_id="eleven_turbo_v2_5" 
         )
-        # Combine the generator stream into bytes
+        
+        # Combine the generator stream into a single readable bytes object
         audio_bytes = b"".join(audio_generator)
         return audio_bytes
+        
     except Exception as e:
         st.error(f"ElevenLabs Error: {e}")
         return None
