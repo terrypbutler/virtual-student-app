@@ -278,7 +278,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
                             st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                             
-                            audio_bytes = get_azure_audio(reply_text, student_voice_name, pitch=active_pitch, rate=active_rate)
+                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -443,7 +444,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
                             base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
                             
-                            audio_bytes = get_azure_audio(student_reply, student_voice_name, pitch=base_pitch, rate=base_rate)
+                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -500,7 +502,8 @@ def render_academic_responses(df, cohort, subject="General"):
                                 active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
                                 st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                                 
-                                audio_bytes = get_azure_audio(reply_text, student_voice_name, pitch=active_pitch, rate=active_rate)
+                                student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                                audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
                                 if audio_bytes is None:
                                     st.stop()
                                 else:
@@ -546,7 +549,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
                             base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
                             
-                            audio_bytes = get_azure_audio(student_reply, student_voice_name, pitch=base_pitch, rate=base_rate)
+                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
                             if audio_bytes:
                                 st.session_state["latest_audio"] = audio_bytes
                             st.rerun()
@@ -603,7 +607,8 @@ def render_academic_responses(df, cohort, subject="General"):
                             active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
                             st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                             
-                            audio_bytes = get_azure_audio(reply_text, student_voice_name, pitch=active_pitch, rate=active_rate)
+                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
                             if audio_bytes is None:
                                 st.stop()
                             else:
