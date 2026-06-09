@@ -110,65 +110,56 @@ def render_simulator(df, cohort):
         # 5. The Chat Input & AI Generation
         teacher_input = st.chat_input(f"Say something to {selected_student}...")
         
-        if teacher_input:
-            # Show the teacher's message instantly
+       if teacher_input:
             st.session_state[chat_key].append({"role": "user", "content": teacher_input})
-            with st.chat_message("user"):
-                st.write(teacher_input)
+            with st.chat_message("user"): st.write(teacher_input)
 
-            # Build the continuous transcript so the AI remembers the conversation!
             transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
-# Build the invisible System Prompt
             system_prompt = f"""
-            You are roleplaying as a {age}-year-old UK secondary school student named {selected_student}.
-            Here is your background data:
-            - Special Educational Needs (SEN): {sen}
-            - English as Additional Language (EAL): {eal}
-            - General Academic Level: {predicted}
-            - Home Life and Interests: {home_life}
-            - Suspensions: {suspensions}
+            You are roleplaying as a {age}-year-old UK student named {selected_student}.
+            Data: SEN: {sen} | EAL: {eal} | Grade: {predicted} | Home: {home_life} | Suspensions: {suspensions}
+            Scenario: {scenario}.
             
-            The current scenario is: {scenario}.
-            
-            Here is the conversation transcript so far:
+            Transcript:
             {transcript}
             
-            CRITICAL RULES FOR YOUR RESPONSE:
-            1. Include non-verbal communication, body language, and facial expressions to show your mood.
-            2. You MUST wrap ALL non-verbal actions in asterisks (e.g., *slumps in chair*, *avoids eye contact*).
-            3. Include your spoken dialogue normally alongside the actions.
-            4. DO NOT start the response with your name (e.g., NEVER write "{selected_student}:").
-            5. Keep your response short and realistic for a teenager.
+            CRITICAL RULES:
+            1. Respond as {selected_student}. Keep it short (1-3 sentences).
+            2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].
+            3. You MUST return your response as a raw JSON object with two keys: "dialogue" and "emotion".
+            
+            Example Format:
+            {{"dialogue": "I don't know why you're picking on me, sir. I wasn't even talking.", "emotion": "defensive"}}
             """
 
-            # Call the AI
             with st.spinner(f"{selected_student} is reacting..."):
                 try:
-                    import re
                     model = genai.GenerativeModel('gemini-3.5-flash')
-                    response = model.generate_content(system_prompt)
+                    response = model.generate_content(system_prompt, generation_config={"response_mime_type": "application/json"})
                     
-                    # 1. THE DISPLAY TEXT: Keep the asterisks so the screen shows the italicized actions
-                    display_text = response.text.replace(f"{selected_student}:", "").strip()
+                    import json
+                    ai_data = json.loads(response.text)
+                    reply_text = ai_data.get("dialogue", "...")
+                    current_emotion = ai_data.get("emotion", "neutral")
                     
-                    # 2. THE AUDIO TEXT: Scrub out all stage directions just for the voice engine
-                    audio_text = re.sub(r'[*\[(].*?[*\])]', '', display_text).strip()
+                    st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
+                    st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                     
-                    # Save the FULL text (with actions) to the chat history so you can see it
-                    st.session_state[chat_key].append({"role": "assistant", "content": display_text})
+                    # --- ELEVENLABS AUDIO TRIGGER (FIXED) ---
+                    # We correctly pull the voice ID from the 'row' variable defined at the top of the file
+                    student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
                     
-                    # --- SAFE AUDIO TRIGGER ---
-                    # Only trigger the voice engine if they actually spoke words out loud
-                    if audio_text:
-                        student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                        audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
-                        if audio_bytes is None:
-                            st.stop() # Freeze to read any errors!
-                        else:
-                            st.session_state["latest_audio_sim"] = audio_bytes
-                            
-                    st.rerun() # Refresh to show text and play audio simultaneously
+                    # We import the function from academic_responses since you defined it there
+                    from modules.academic_responses import get_elevenlabs_audio
+                    
+                    audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                    
+                    if audio_bytes is None:
+                        st.stop()
+                    else:
+                        st.session_state["latest_audio_sim"] = audio_bytes
+                        st.rerun()
                         
                 except Exception as e:
-                    st.error(f"API Error: {e}")
+                    st.error(f"API/Parsing Error: {e}\nRaw output: {response.text if 'response' in locals() else 'No response'}")
