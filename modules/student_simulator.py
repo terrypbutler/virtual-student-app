@@ -22,11 +22,17 @@ def get_flexible_text(row, possible_names):
     return "None recorded"
 
 def render_simulator(df, cohort):
-    st.subheader("🤖 Virtual Student Simulator")
-    
+    # --- HEADER & MASTER TOGGLE ---
+    col_header1, col_header2 = st.columns([3, 1])
+    with col_header1:
+        st.subheader("🤖 Virtual Student Simulator")
+    with col_header2:
+        # This toggle controls whether audio is generated!
+        enable_voice = st.toggle("🔊 Voice Audio", value=True, key="sim_voice_toggle")
+        
     # 1. API Configuration
     if "GEMINI_API_KEY" not in st.secrets:
-        st.error("⚠️ Gemini API Key missing. Please add it to your secrets.toml file.")
+        st.error("⚠️ Gemini API Key missing.")
         return
     
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -87,15 +93,12 @@ def render_simulator(df, cohort):
         teacher_input = st.chat_input(f"Say something to {selected_student}...")
         
         if teacher_input:
-            # Show the teacher's message instantly
             st.session_state[chat_key].append({"role": "user", "content": teacher_input})
             with st.chat_message("user"):
                 st.write(teacher_input)
 
-            # Build the continuous transcript so the AI remembers the conversation!
             transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
-            # Build the invisible System Prompt
             system_prompt = f"""
             You are roleplaying as a {age}-year-old UK student named {selected_student}.
             Data: SEN: {sen} | EAL: {eal} | Grade: {predicted} | Home: {home_life} | Suspensions: {suspensions}
@@ -113,7 +116,6 @@ def render_simulator(df, cohort):
             {{"dialogue": "I don't know why you're picking on me, sir. I wasn't even talking.", "emotion": "defensive"}}
             """
 
-            # Call the AI
             with st.spinner(f"{selected_student} is reacting..."):
                 try:
                     model = genai.GenerativeModel('gemini-3.5-flash')
@@ -123,20 +125,20 @@ def render_simulator(df, cohort):
                     reply_text = ai_data.get("dialogue", "...")
                     current_emotion = ai_data.get("emotion", "neutral")
                     
-                    # Save and show the student's text response
                     st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
                     st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                     
-                    # --- ELEVENLABS AUDIO TRIGGER ---
-                    # Defaults to George (JBFqnCBsd6RMkjVDRZzb) if the spreadsheet is missing an ID
-                    student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                    audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                    # --- TOGGLE LOGIC: ONLY GENERATE AUDIO IF SWITCH IS ON ---
+                    if enable_voice:
+                        student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                        audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                        
+                        if audio_bytes is None:
+                            st.stop() 
+                        else:
+                            st.session_state["latest_audio_sim"] = audio_bytes
                     
-                    if audio_bytes is None:
-                        st.stop() # Freeze to read any errors!
-                    else:
-                        st.session_state["latest_audio_sim"] = audio_bytes
-                        st.rerun() # Refresh to show text and play audio simultaneously
+                    st.rerun() 
                         
                 except Exception as e:
                     st.error(f"API/Parsing Error: {e}")
