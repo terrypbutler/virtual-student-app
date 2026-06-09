@@ -101,9 +101,11 @@ def render_simulator(df, cohort):
                 "{\"dialogue\": \"I don't know why you're picking on me, sir.\", \"emotion\": \"defensive\"}"
             )
 
-            with st.spinner(f"{selected_student} is reacting..."):
+            # --- 1. FAST TEXT GENERATION ---
+            with st.spinner(f"{selected_student} is typing..."):
                 try:
-                    model = genai.GenerativeModel('gemini-2.5-pro')
+                    # SPEED HACK 1: Use the Flash model for instant conversational speed
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     response = model.generate_content(system_prompt, generation_config={"response_mime_type": "application/json"})
 
                     if not response.parts:
@@ -115,20 +117,35 @@ def render_simulator(df, cohort):
 
                     reply_text = ai_data.get("dialogue", "...")
                     current_emotion = ai_data.get("emotion", "neutral")
+                    
+                except Exception as e:
+                    st.error(f"Gemini API Error: {e}")
+                    st.stop()
 
-                    st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
-                    st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
+            # SPEED HACK 2: Instantly show the text on screen BEFORE generating audio
+            st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
+            with st.chat_message("assistant"):
+                st.write(reply_text)
+                
+            st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
 
-                    if enable_voice:
+            # --- 2. BACKGROUND AUDIO GENERATION ---
+            if enable_voice:
+                with st.spinner(f"Generating audio..."):
+                    try:
                         student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                        
+                        # We pass the fast text directly to ElevenLabs
                         audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
 
                         if audio_bytes is None:
-                            st.warning("Text generated successfully, but ElevenLabs audio failed.")
+                            st.warning("ElevenLabs audio failed.")
                         else:
                             st.session_state["latest_audio_sim"] = audio_bytes
-
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"Gemini API Error: {e}")
+                            st.rerun() # Only rerun once the audio is ready to play
+                            
+                    except Exception as e:
+                        st.error(f"Audio Error: {e}")
+            else:
+                # If voice is off, just stop here so the text stays on screen
+                st.stop()
