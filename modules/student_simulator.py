@@ -161,7 +161,8 @@ def render_simulator(df, cohort):
                     # --- SAFE AUDIO TRIGGER ---
                     # Only trigger the voice engine if they actually spoke words out loud
                     if audio_text:
-                        audio_bytes = get_edge_audio(audio_text, student_voice_name)
+                        student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                        audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
                         if audio_bytes is None:
                             st.stop() # Freeze to read any errors!
                         else:
