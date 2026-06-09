@@ -1,36 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
-import asyncio
-import edge_tts
-import tempfile
+import json
 from modules.photo_utils import display_student_photo
 
-# --- MICROSOFT NEURAL TTS ENGINE (100% FREE & UNLIMITED) ---
-def get_edge_audio(text, voice_name="en-GB-RyanNeural"):
-    """Silently generates premium speech audio using Microsoft's free Neural voices."""
-    if not voice_name or str(voice_name).upper() in ["NAN", "NONE", "", "N/A"]:
-        voice_name = "en-GB-RyanNeural"
-        
-    async def _generate():
-        communicate = edge_tts.Communicate(text, str(voice_name).strip())
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f:
-            temp_path = f.name
-        await communicate.save(temp_path)
-        return temp_path
-
-    try:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-        temp_file_path = loop.run_until_complete(_generate())
-        with open(temp_file_path, "rb") as audio_file:
-            return audio_file.read()
-    except Exception as e:
-        st.error(f"Failed to fetch Microsoft Neural audio: {e}")
-        return None
+# Import your ElevenLabs function from the other file
+try:
+    from modules.academic_responses import get_elevenlabs_audio
+except ImportError:
+    st.error("⚠️ Could not find get_elevenlabs_audio in modules.academic_responses")
 
 def get_flexible_text(row, possible_names):
     """Helper to safely extract data from the row."""
@@ -70,7 +47,6 @@ def render_simulator(df, cohort):
     predicted = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
     suspensions = get_flexible_text(row, ["Suspension days", "Suspensions"])
     eal = get_flexible_text(row, ["EAL", "EAL Status"])
-    student_voice_name = row.get("Voice_Name", "en-GB-RyanNeural")
     
     st.markdown("---")
     
@@ -110,12 +86,16 @@ def render_simulator(df, cohort):
         # 5. The Chat Input & AI Generation
         teacher_input = st.chat_input(f"Say something to {selected_student}...")
         
-       if teacher_input:
+        if teacher_input:
+            # Show the teacher's message instantly
             st.session_state[chat_key].append({"role": "user", "content": teacher_input})
-            with st.chat_message("user"): st.write(teacher_input)
+            with st.chat_message("user"):
+                st.write(teacher_input)
 
+            # Build the continuous transcript so the AI remembers the conversation!
             transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
+            # Build the invisible System Prompt
             system_prompt = f"""
             You are roleplaying as a {age}-year-old UK student named {selected_student}.
             Data: SEN: {sen} | EAL: {eal} | Grade: {predicted} | Home: {home_life} | Suspensions: {suspensions}
@@ -133,33 +113,30 @@ def render_simulator(df, cohort):
             {{"dialogue": "I don't know why you're picking on me, sir. I wasn't even talking.", "emotion": "defensive"}}
             """
 
+            # Call the AI
             with st.spinner(f"{selected_student} is reacting..."):
                 try:
                     model = genai.GenerativeModel('gemini-3.5-flash')
                     response = model.generate_content(system_prompt, generation_config={"response_mime_type": "application/json"})
                     
-                    import json
                     ai_data = json.loads(response.text)
                     reply_text = ai_data.get("dialogue", "...")
                     current_emotion = ai_data.get("emotion", "neutral")
                     
+                    # Save and show the student's text response
                     st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
                     st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                     
-                    # --- ELEVENLABS AUDIO TRIGGER (FIXED) ---
-                    # We correctly pull the voice ID from the 'row' variable defined at the top of the file
+                    # --- ELEVENLABS AUDIO TRIGGER ---
+                    # Defaults to George (JBFqnCBsd6RMkjVDRZzb) if the spreadsheet is missing an ID
                     student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                    
-                    # We import the function from academic_responses since you defined it there
-                    from modules.academic_responses import get_elevenlabs_audio
-                    
                     audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
                     
                     if audio_bytes is None:
-                        st.stop()
+                        st.stop() # Freeze to read any errors!
                     else:
                         st.session_state["latest_audio_sim"] = audio_bytes
-                        st.rerun()
+                        st.rerun() # Refresh to show text and play audio simultaneously
                         
                 except Exception as e:
-                    st.error(f"API/Parsing Error: {e}\nRaw output: {response.text if 'response' in locals() else 'No response'}")
+                    st.error(f"API/Parsing Error: {e}")
