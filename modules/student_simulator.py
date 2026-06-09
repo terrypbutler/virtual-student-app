@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import json
+import re
 from modules.photo_utils import display_student_photo
 
 try:
@@ -87,7 +88,6 @@ def render_simulator(df, cohort):
 
             transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
-            # Reformatted string block to prevent indentation errors!
             system_prompt = (
                 f"You are roleplaying as a {age}-year-old UK student named {selected_student}.\n"
                 f"Data: SEN: {sen} | EAL: {eal} | Grade: {predicted} | Home: {home_life} | Suspensions: {suspensions}\n"
@@ -95,16 +95,16 @@ def render_simulator(df, cohort):
                 f"Transcript:\n{transcript}\n\n"
                 "CRITICAL RULES:\n"
                 f"1. Respond as {selected_student}. Keep it short (1-3 sentences).\n"
-                "2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].\n"
-                "3. You MUST return your response as a raw JSON object with two keys: \"dialogue\" and \"emotion\".\n\n"
+                "2. MUST include non-verbal body language wrapped in asterisks (e.g., *rolls eyes*, *sighs*).\n"
+                "3. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].\n"
+                "4. You MUST return your response as a raw JSON object with two keys: \"dialogue\" and \"emotion\".\n\n"
                 "Example Format:\n"
-                "{\"dialogue\": \"I don't know why you're picking on me, sir.\", \"emotion\": \"defensive\"}"
+                "{\"dialogue\": \"*crosses arms* I don't know why you're picking on me, sir.\", \"emotion\": \"defensive\"}"
             )
 
             # --- 1. FAST TEXT GENERATION ---
             with st.spinner(f"{selected_student} is typing..."):
                 try:
-                    # SPEED HACK 1: Use the Flash model for instant conversational speed
                     model = genai.GenerativeModel('gemini-2.5-flash')
                     response = model.generate_content(system_prompt, generation_config={"response_mime_type": "application/json"})
 
@@ -115,37 +115,41 @@ def render_simulator(df, cohort):
                     raw_text = response.text.replace("```json", "").replace("```", "")
                     ai_data = json.loads(raw_text.strip())
 
-                    reply_text = ai_data.get("dialogue", "...")
+                    display_text = ai_data.get("dialogue", "...")
                     current_emotion = ai_data.get("emotion", "neutral")
                     
                 except Exception as e:
                     st.error(f"Gemini API Error: {e}")
                     st.stop()
 
-            # SPEED HACK 2: Instantly show the text on screen BEFORE generating audio
-            st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
+            # SPEED HACK: Instantly show the text on screen BEFORE generating audio
+            st.session_state[chat_key].append({"role": "assistant", "content": display_text})
             with st.chat_message("assistant"):
-                st.write(reply_text)
+                st.write(display_text)
                 
             st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
 
+            # --- THE SCRUBBER: Remove actions for the audio engine ---
+            # This deletes anything wrapped in *, [, or ( so ElevenLabs doesn't read it
+            audio_text = re.sub(r'[*\[(].*?[*\])]', '', display_text).strip()
+
             # --- 2. BACKGROUND AUDIO GENERATION ---
-            if enable_voice:
+            # Only run ElevenLabs if the voice is toggled ON and there is actually text left to speak
+            if enable_voice and audio_text:
                 with st.spinner(f"Generating audio..."):
                     try:
                         student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
                         
-                        # We pass the fast text directly to ElevenLabs
-                        audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                        # We pass the pure, scrubbed text directly to ElevenLabs
+                        audio_bytes = get_elevenlabs_audio(audio_text, student_voice_id)
 
                         if audio_bytes is None:
                             st.warning("ElevenLabs audio failed.")
                         else:
                             st.session_state["latest_audio_sim"] = audio_bytes
-                            st.rerun() # Only rerun once the audio is ready to play
+                            st.rerun() 
                             
                     except Exception as e:
                         st.error(f"Audio Error: {e}")
             else:
-                # If voice is off, just stop here so the text stays on screen
                 st.stop()
