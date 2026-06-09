@@ -121,12 +121,13 @@ def render_simulator(df, cohort):
                     model = genai.GenerativeModel('gemini-3.5-flash')
                     response = model.generate_content(system_prompt, generation_config={"response_mime_type": "application/json"})
                     
-                    ai_data = json.loads(response.text)
+                    # --- NEW ROBUST JSON SCRUBBER ---
+                    raw_text = response.text
+                    raw_text = raw_text.replace("```json", "").replace("```", "")
+                    ai_data = json.loads(raw_text.strip())
+                    
                     reply_text = ai_data.get("dialogue", "...")
                     current_emotion = ai_data.get("emotion", "neutral")
-                    
-                    st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
-                    st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                     
                     # --- TOGGLE LOGIC: ONLY GENERATE AUDIO IF SWITCH IS ON ---
                     if enable_voice:
