@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import azure.cognitiveservices.speech as speechsdk
+from elevenlabs.client import ElevenLabs
 import json
 import time
 import random
@@ -8,39 +8,35 @@ import re
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
-from elevenlabs.client import ElevenLabs
-import streamlit as st
-
-from elevenlabs.client import ElevenLabs
-import streamlit as st
-
+# --- MODERN ELEVENLABS ENGINE ---
 def get_elevenlabs_audio(text, voice_id="JBFqnCBsd6RMkjVDRZzb"):
-    """
-    Generates premium audio using the modern ElevenLabs v1.0+ SDK.
-    voice_id: The unique ID from your ElevenLabs Voice Library.
-    """
     if "ELEVENLABS_API_KEY" not in st.secrets:
         st.error("⚠️ ELEVENLABS_API_KEY missing.")
         return None
         
     try:
-        # Initialize the modern client
         client = ElevenLabs(api_key=st.secrets["ELEVENLABS_API_KEY"])
-        
-        # The new syntax for generating speech
         audio_generator = client.text_to_speech.convert(
             text=text,
             voice_id=voice_id,
             model_id="eleven_turbo_v2_5" 
         )
-        
-        # Combine the generator stream into a single readable bytes object
-        audio_bytes = b"".join(audio_generator)
-        return audio_bytes
-        
+        return b"".join(audio_generator)
     except Exception as e:
         st.error(f"ElevenLabs Error: {e}")
         return None
+
+def get_flexible_text(row, possible_names, default="None recorded"):
+    row_keys = {str(k).strip().lower(): k for k in row.keys()}
+    for name in possible_names:
+        clean_name = name.lower().strip()
+        if clean_name in row_keys:
+            val = str(row[row_keys[clean_name]]).strip()
+            if val and val.upper() not in ["NAN", "N/A", "NONE", "NULL", ""]:
+                if val.endswith(".0"): val = val[:-2]
+                return val
+    return default
+
 def fetch_ai_answers(question, student_subset, instructions, uploaded_file, cohort, subject, teacher_name, is_written=False):
     age_context = "11 to 12 years old" if cohort == "Year 7" else "14 to 15 years old"
     
@@ -170,8 +166,14 @@ def create_printable_worksheet(question, answers, df, subject, cohort):
     return "\n".join(html)
 
 def render_academic_responses(df, cohort, subject="General"):
-    st.subheader(f"🎓 AfL Simulator: {subject} Questioning")
-    
+    # --- HEADER & MASTER TOGGLE ---
+    col_header1, col_header2 = st.columns([3, 1])
+    with col_header1:
+        st.subheader(f"🎓 AfL Simulator: {subject} Questioning")
+    with col_header2:
+        # Master Voice Toggle for the AfL Tab
+        enable_voice = st.toggle("🔊 Voice Audio", value=True, key="afl_voice_toggle")
+        
     if "GEMINI_API_KEY" not in st.secrets:
         st.error("⚠️ Gemini API Key missing.")
         return
@@ -251,10 +253,6 @@ def render_academic_responses(df, cohort, subject="General"):
                         target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                         target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
                         
-                        student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                        base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
-                        base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
-                        
                         transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
                         
                         chat_prompt = f"""
@@ -282,14 +280,14 @@ def render_academic_responses(df, cohort, subject="General"):
                             current_emotion = ai_data.get("emotion", "neutral")
                             
                             st.session_state[chat_key].append({"role": "student", "content": reply_text})
-                            
-                            active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
                             st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                             
-                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                            if audio_bytes:
-                                st.session_state["latest_audio"] = audio_bytes
+                            if enable_voice:
+                                student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                                audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                                if audio_bytes:
+                                    st.session_state["latest_audio"] = audio_bytes
+                                    
                             st.rerun()
                                 
                         except Exception as e:
@@ -448,14 +446,13 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
-                            base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
                             
-                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                            if audio_bytes:
-                                st.session_state["latest_audio"] = audio_bytes
+                            if enable_voice:
+                                student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                                audio_bytes = get_elevenlabs_audio(student_reply, student_voice_id)
+                                if audio_bytes:
+                                    st.session_state["latest_audio"] = audio_bytes
+                                    
                             st.rerun()
                 else:
                     for msg in st.session_state[chat_key]:
@@ -474,10 +471,6 @@ def render_academic_responses(df, cohort, subject="General"):
                             target_row = df[df["Full Name"] == target_name].iloc[0]
                             target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                             target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
-                            
-                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
-                            base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
                             
                             transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
 
@@ -506,17 +499,15 @@ def render_academic_responses(df, cohort, subject="General"):
                                 current_emotion = ai_data.get("emotion", "neutral")
                                 
                                 st.session_state[chat_key].append({"role": "student", "content": reply_text})
-                                
-                                active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
                                 st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                                 
-                                student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                                audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                                if audio_bytes is None:
-                                    st.stop()
-                                else:
-                                    st.session_state["latest_audio"] = audio_bytes
-                                    st.rerun()
+                                if enable_voice:
+                                    student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                                    audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                                    if audio_bytes:
+                                        st.session_state["latest_audio"] = audio_bytes
+                                        
+                                st.rerun()
                             except Exception as e:
                                 st.error("Failed to generate response.")
 
@@ -553,14 +544,13 @@ def render_academic_responses(df, cohort, subject="General"):
                             st.session_state[chat_key].append({"role": "student", "content": student_reply})
                             
                             target_row = df[df["Full Name"] == target_name].iloc[0]
-                            student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                            base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
-                            base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
                             
-                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                            if audio_bytes:
-                                st.session_state["latest_audio"] = audio_bytes
+                            if enable_voice:
+                                student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                                audio_bytes = get_elevenlabs_audio(student_reply, student_voice_id)
+                                if audio_bytes:
+                                    st.session_state["latest_audio"] = audio_bytes
+                                    
                             st.rerun()
             else:
                 for msg in st.session_state[chat_key]:
@@ -579,10 +569,6 @@ def render_academic_responses(df, cohort, subject="General"):
                         target_row = df[df["Full Name"] == target_name].iloc[0]
                         target_grade = get_flexible_text(target_row, ["Projected Grade", "Predicted Grade"])
                         target_sen = get_flexible_text(target_row, ["SEN Status", "SEND Status"])
-                        
-                        student_voice_name = target_row.get("Voice_Name", "en-GB-RyanNeural")
-                        base_pitch = get_flexible_text(target_row, ["Base_Pitch", "Pitch"], default="+0%")
-                        base_rate = get_flexible_text(target_row, ["Base_Rate", "Rate"], default="+0%")
                         
                         transcript = "\n".join([f"{'Teacher' if m['role']=='teacher' else 'Student'}: {m['content']}" for m in st.session_state[chat_key]])
                         
@@ -611,17 +597,14 @@ def render_academic_responses(df, cohort, subject="General"):
                             current_emotion = ai_data.get("emotion", "neutral")
                             
                             st.session_state[chat_key].append({"role": "student", "content": reply_text})
-                            
-                            active_pitch, active_rate = calculate_emotion_modifiers(base_pitch, base_rate, current_emotion)
                             st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
                             
-                            student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
-                            audio_bytes = get_elevenlabs_audio(reply.text, student_voice_id)
-                            if audio_bytes is None:
-                                st.stop()
-                            else:
-                                st.session_state["latest_audio"] = audio_bytes
-                                st.rerun()
+                            if enable_voice:
+                                student_voice_id = target_row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
+                                audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
+                                if audio_bytes:
+                                    st.session_state["latest_audio"] = audio_bytes
+                                    
+                            st.rerun()
                         except Exception as e:
                             st.error(f"Failed to generate response: {e}")
-                    
