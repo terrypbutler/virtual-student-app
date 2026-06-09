@@ -8,7 +8,6 @@ import re
 from PIL import Image
 from modules.photo_utils import display_student_photo
 
-# --- MODERN ELEVENLABS ENGINE ---
 def get_elevenlabs_audio(text, voice_id="JBFqnCBsd6RMkjVDRZzb"):
     if "ELEVENLABS_API_KEY" not in st.secrets:
         st.error("⚠️ ELEVENLABS_API_KEY missing.")
@@ -19,7 +18,8 @@ def get_elevenlabs_audio(text, voice_id="JBFqnCBsd6RMkjVDRZzb"):
         audio_generator = client.text_to_speech.convert(
             text=text,
             voice_id=voice_id,
-            model_id="eleven_turbo_v2_5" 
+            model_id="eleven_turbo_v2_5",
+            output_format="mp3_44100_96" # SPEED HACK 3: Highly compressed MP3 stream
         )
         return b"".join(audio_generator)
     except Exception as e:
