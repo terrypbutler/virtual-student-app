@@ -116,12 +116,18 @@ def render_simulator(df, cohort):
             {{"dialogue": "I don't know why you're picking on me, sir. I wasn't even talking.", "emotion": "defensive"}}
             """
 
-            with st.spinner(f"{selected_student} is reacting..."):
+           with st.spinner(f"{selected_student} is reacting..."):
                 try:
-                    model = genai.GenerativeModel('gemini-3.5-flash')
+                    # 1. Use the proven model from the AfL tab
+                    model = genai.GenerativeModel('gemini-2.5-pro')
                     response = model.generate_content(system_prompt, generation_config={"response_mime_type": "application/json"})
                     
-                    # --- NEW ROBUST JSON SCRUBBER ---
+                    # 2. Safety Catch: Check if Gemini refused to answer due to content filters
+                    if not response.parts:
+                        st.error("⚠️ Gemini refused to answer. The scenario likely triggered a safety filter.")
+                        st.stop()
+
+                    # 3. Robust JSON Scrubber
                     raw_text = response.text
                     raw_text = raw_text.replace("```json", "").replace("```", "")
                     ai_data = json.loads(raw_text.strip())
@@ -129,17 +135,21 @@ def render_simulator(df, cohort):
                     reply_text = ai_data.get("dialogue", "...")
                     current_emotion = ai_data.get("emotion", "neutral")
                     
-                    # --- TOGGLE LOGIC: ONLY GENERATE AUDIO IF SWITCH IS ON ---
+                    st.session_state[chat_key].append({"role": "assistant", "content": reply_text})
+                    st.toast(f"Student Mood: {current_emotion.upper()} 🎭")
+                    
+                    # --- TOGGLE LOGIC ---
                     if enable_voice:
                         student_voice_id = row.get("Voice_Name", "JBFqnCBsd6RMkjVDRZzb")
                         audio_bytes = get_elevenlabs_audio(reply_text, student_voice_id)
                         
                         if audio_bytes is None:
-                            st.stop() 
+                            st.warning("Text generated successfully, but ElevenLabs audio failed.")
                         else:
                             st.session_state["latest_audio_sim"] = audio_bytes
                     
                     st.rerun() 
                         
                 except Exception as e:
-                    st.error(f"API/Parsing Error: {e}")
+                    # This will force any hidden errors onto the screen so we can read them!
+                    st.error(f"Gemini API Error: {e}")
