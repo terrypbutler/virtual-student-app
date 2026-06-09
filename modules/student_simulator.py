@@ -87,20 +87,19 @@ def render_simulator(df, cohort):
 
             transcript = "\n".join([f"{'Teacher' if m['role']=='user' else selected_student}: {m['content']}" for m in st.session_state[chat_key]])
 
-            system_prompt = f"""You are roleplaying as a {age}-year-old UK student named {selected_student}.
-Data: SEN: {sen} | EAL: {eal} | Grade: {predicted} | Home: {home_life} | Suspensions: {suspensions}
-Scenario: {scenario}.
-
-Transcript:
-{transcript}
-
-CRITICAL RULES:
-1. Respond as {selected_student}. Keep it short (1-3 sentences).
-2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].
-3. You MUST return your response as a raw JSON object with two keys: "dialogue" and "emotion".
-
-Example Format:
-{{"dialogue": "I don't know why you're picking on me, sir.", "emotion": "defensive"}}"""
+            # Reformatted string block to prevent indentation errors!
+            system_prompt = (
+                f"You are roleplaying as a {age}-year-old UK student named {selected_student}.\n"
+                f"Data: SEN: {sen} | EAL: {eal} | Grade: {predicted} | Home: {home_life} | Suspensions: {suspensions}\n"
+                f"Scenario: {scenario}.\n\n"
+                f"Transcript:\n{transcript}\n\n"
+                "CRITICAL RULES:\n"
+                f"1. Respond as {selected_student}. Keep it short (1-3 sentences).\n"
+                "2. Determine the student's current emotion based on the scenario and teacher's prompt. Pick ONE: [neutral, angry, defensive, sad, bored, hesitant, excited, eager].\n"
+                "3. You MUST return your response as a raw JSON object with two keys: \"dialogue\" and \"emotion\".\n\n"
+                "Example Format:\n"
+                "{\"dialogue\": \"I don't know why you're picking on me, sir.\", \"emotion\": \"defensive\"}"
+            )
 
             with st.spinner(f"{selected_student} is reacting..."):
                 try:
