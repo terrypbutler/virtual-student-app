@@ -21,7 +21,7 @@ df_y10 = load_data(YEAR_10_URL)
 
 st.sidebar.title("🎓 Butler Academy")
 
-page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL", "Lesson Stress-Tester"])
+page = st.sidebar.radio("Navigate", ["Student Search", "Year 7", "Year 10", "Analytics", "Seating Plan", "Simulator", "Academic AfL", "Lesson Stress-Tester", "Observe Learning"])
 
 if page == "Student Search":
     st.title("🔍 Student Search (MIS View)")
@@ -359,3 +359,8 @@ elif page == "Lesson Stress-Tester":
     # 3. Render the module
     from modules.lesson_stress_tester import render_stress_tester
     render_stress_tester(filtered_df, cohort, selected_subject)
+
+# In your app.py page routing section:
+elif page == "Observe Learning":
+    from modules.observe_learning import render_observation_room
+    render_observation_room(filtered_df, cohort)
