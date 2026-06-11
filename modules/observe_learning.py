@@ -41,9 +41,10 @@ def render_observation_room(df, cohort):
     if "obs_intervene_target" not in st.session_state: st.session_state.obs_intervene_target = None
     if "obs_active_students" not in st.session_state: st.session_state.obs_active_students = []
     
-    # NEW: Global Timer Variables
     if "obs_task_duration" not in st.session_state: st.session_state.obs_task_duration = 30
     if "obs_time_elapsed" not in st.session_state: st.session_state.obs_time_elapsed = 0
+    # NEW: Engagement Log Tracker
+    if "obs_engagement_log" not in st.session_state: st.session_state.obs_engagement_log = None
     
     if "student_states" not in st.session_state: st.session_state.student_states = {}
 
@@ -153,13 +154,11 @@ def render_observation_room(df, cohort):
 
     # --- 3. THE FULL ROOM VIEW ---
     else:
-        # SECTION A: Task Initialization
         st.markdown("### 1. Set the Independent Task")
         current_task = st.text_area("Describe the task:", placeholder="e.g., 'Copy the perspective drawing.'", value=st.session_state.obs_task)
         
         col_dur, col_up = st.columns(2)
         with col_dur:
-            # NEW: Duration Slider
             task_duration = st.slider("Expected Task Duration (Minutes):", min_value=5, max_value=60, value=st.session_state.obs_task_duration, step=5)
         with col_up:
             uploaded_file = st.file_uploader("Upload reference resource (Optional)", type=['png', 'jpg', 'jpeg'])
@@ -177,6 +176,7 @@ def render_observation_room(df, cohort):
                 st.session_state.obs_task = current_task
                 st.session_state.obs_task_duration = task_duration
                 st.session_state.obs_time_elapsed = 0
+                st.session_state.obs_engagement_log = None # Reset the log
                 
                 if uploaded_file is not None:
                     st.session_state.obs_image = Image.open(uploaded_file)
@@ -196,57 +196,129 @@ def render_observation_room(df, cohort):
                         "decay_rate": random.randint(10, 20) if sen and sen.upper() != "NONE" else random.randint(5, 12)
                     }
                 
-                st.session_state.live_observations = {name: "Reviewing the task material." for name in st.session_state.obs_active_students}
+                st.session_state.live_observations = {name: "Waiting for task to begin." for name in st.session_state.obs_active_students}
                 st.rerun()
 
         with col2:
             if st.session_state.obs_active_students:
-                if st.button("⏱️ Advance Time (5 Mins) & Scan Full Room", use_container_width=True):
-                    # Update global clock
-                    st.session_state.obs_time_elapsed += 5
-                    
-                    for name in st.session_state.obs_active_students:
-                        stats = st.session_state.student_states[name]
-                        stats["motivation"] = max(0, stats["motivation"] - stats["decay_rate"])
-                        if stats["motivation"] > 40:
-                            stats["progress"] = min(100, stats["progress"] + random.randint(10, 25))
-
-                    profiles = []
-                    for name in st.session_state.obs_active_students:
-                        mot = st.session_state.student_states[name]["motivation"]
-                        prog = st.session_state.student_states[name]["progress"]
-                        profiles.append(f"- {name} | Motivation: {mot}% | Progress: {prog}%")
-                    
-                    obs_prompt = (
-                        f"Task: '{current_task}'\n"
-                        f"Generate a 1-sentence physical observation of each student based on their numbers.\n"
-                        f"{chr(10).join(profiles)}\n\n"
-                        "RULES: If motivation > 70%, they are focused. If 40-70%, they are distracted. If <40%, they are completely off-task. If progress is 100%, they are finished.\n"
-                        "Return a ONLY a raw JSON dict with names as keys and observations as values."
-                    )
-                    
-                    with st.spinner(f"Scanning {len(st.session_state.obs_active_students)} students..."):
-                        try:
-                            model = genai.GenerativeModel('gemini-2.5-flash')
-                            contents = [obs_prompt]
-                            if st.session_state.obs_image is not None: contents.append(st.session_state.obs_image)
+                # --- NEW MECHANIC: THE "START TASK" BUTTON ---
+                if st.session_state.obs_time_elapsed == 0:
+                    if st.button("👀 Watch Class Start (Simulate First 5 Minutes)", type="secondary", use_container_width=True):
+                        st.session_state.obs_time_elapsed += 5
+                        
+                        profiles = []
+                        for name in st.session_state.obs_active_students:
+                            mot = st.session_state.student_states[name]["motivation"]
+                            profiles.append(f"- {name} | Motivation: {mot}%")
+                        
+                        start_prompt = (
+                            f"Task: '{current_task}'\n"
+                            "The teacher has just said 'Go!'. We are simulating the critical first 5 minutes.\n"
+                            f"Current Class Profiles:\n{chr(10).join(profiles)}\n\n"
+                            "CRITICAL RULES:\n"
+                            "1. Determine exactly when each student engages with the task based on their motivation.\n"
+                            "   - Motivation >70: Engages immediately (0:00 to 0:45).\n"
+                            "   - Motivation 40-70: Delayed start (1:00 to 3:30).\n"
+                            "   - Motivation <40: Fails to start within 5 minutes (return 'Failed').\n"
+                            "2. Provide a 1-sentence description of their start-up behavior.\n"
+                            "3. Return ONLY a JSON dictionary where keys are names and values are dicts containing 'time' and 'desc'.\n"
+                            "Example:\n"
+                            "{\"Bella\": {\"time\": \"0:15\", \"desc\": \"*opens book and writes the title*\"}, \"Oscar\": {\"time\": \"Failed\", \"desc\": \"*stares out the window and taps pen*\"}}"
+                        )
+                        
+                        with st.spinner("Watching the room settle..."):
+                            try:
+                                model = genai.GenerativeModel('gemini-2.5-flash')
+                                contents = [start_prompt]
+                                if st.session_state.obs_image is not None: contents.append(st.session_state.obs_image)
+                                    
+                                response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
+                                raw_text = response.text.replace("```json", "").replace("```", "")
+                                log_data = json.loads(raw_text.strip())
                                 
-                            response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-                            raw_text = response.text.replace("```json", "").replace("```", "")
-                            st.session_state.live_observations = json.loads(raw_text.strip())
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed scan: {e}")
+                                st.session_state.obs_engagement_log = log_data
+                                
+                                # Update their live observations and progress to match the log
+                                for name, data in log_data.items():
+                                    st.session_state.live_observations[name] = data.get("desc", "")
+                                    if data.get("time") != "Failed":
+                                        st.session_state.student_states[name]["progress"] += random.randint(5, 15)
+                                        
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Failed to track start: {e}")
+                                
+                # --- STANDARD ADVANCE TIME BUTTON ---
+                else:
+                    if st.button("⏱️ Advance Time (5 Mins) & Scan Room", use_container_width=True):
+                        st.session_state.obs_time_elapsed += 5
+                        
+                        for name in st.session_state.obs_active_students:
+                            stats = st.session_state.student_states[name]
+                            stats["motivation"] = max(0, stats["motivation"] - stats["decay_rate"])
+                            if stats["motivation"] > 40:
+                                stats["progress"] = min(100, stats["progress"] + random.randint(10, 25))
+
+                        profiles = []
+                        for name in st.session_state.obs_active_students:
+                            mot = st.session_state.student_states[name]["motivation"]
+                            prog = st.session_state.student_states[name]["progress"]
+                            profiles.append(f"- {name} | Motivation: {mot}% | Progress: {prog}%")
+                        
+                        obs_prompt = (
+                            f"Task: '{current_task}'\n"
+                            f"Generate a 1-sentence physical observation of each student based on their numbers.\n"
+                            f"{chr(10).join(profiles)}\n\n"
+                            "RULES: If motivation > 70%, focused. If 40-70%, distracted. If <40%, off-task. If progress 100%, finished.\n"
+                            "Return a ONLY a raw JSON dict with names as keys and observations as values."
+                        )
+                        
+                        with st.spinner(f"Scanning {len(st.session_state.obs_active_students)} students..."):
+                            try:
+                                model = genai.GenerativeModel('gemini-2.5-flash')
+                                contents = [obs_prompt]
+                                if st.session_state.obs_image is not None: contents.append(st.session_state.obs_image)
+                                    
+                                response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
+                                raw_text = response.text.replace("```json", "").replace("```", "")
+                                st.session_state.live_observations = json.loads(raw_text.strip())
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Failed scan: {e}")
 
         st.markdown("---")
 
-        # SECTION B: Live Class Dashboard & Broadcasting
+        # SECTION B: Live Class Dashboard
         if st.session_state.obs_active_students:
             
-            # --- GLOBAL TIMER DISPLAY ---
             progress_fraction = min(1.0, st.session_state.obs_time_elapsed / st.session_state.obs_task_duration)
             st.progress(progress_fraction)
             st.markdown(f"<div style='text-align: center; font-weight: bold; margin-bottom: 20px; color: #555;'>⏱️ Time Elapsed: {st.session_state.obs_time_elapsed} / {st.session_state.obs_task_duration} Minutes</div>", unsafe_allow_html=True)
+            
+            # --- NEW: DISPLAY THE ENGAGEMENT LOG ---
+            if st.session_state.obs_engagement_log is not None and st.session_state.obs_time_elapsed == 5:
+                st.success("The first 5 minutes have passed. Review the Engagement Tracker below.")
+                with st.expander("📋 Latency to Engage (Start-up Tracker)", expanded=True):
+                    col_fast, col_slow, col_fail = st.columns(3)
+                    with col_fast:
+                        st.markdown("🟢 **Immediate Start**")
+                        for name, data in st.session_state.obs_engagement_log.items():
+                            t = data.get("time", "Failed")
+                            if t != "Failed" and int(t.split(":")[0]) < 1:
+                                st.markdown(f"**{name}** ({t})")
+                    with col_slow:
+                        st.markdown("🟡 **Delayed Start**")
+                        for name, data in st.session_state.obs_engagement_log.items():
+                            t = data.get("time", "Failed")
+                            if t != "Failed" and int(t.split(":")[0]) >= 1:
+                                st.markdown(f"**{name}** ({t})")
+                    with col_fail:
+                        st.markdown("🔴 **Failed to Engage**")
+                        for name, data in st.session_state.obs_engagement_log.items():
+                            t = data.get("time", "Failed")
+                            if t == "Failed":
+                                st.markdown(f"**{name}**")
+                st.markdown("---")
             
             total_mot = sum(st.session_state.student_states[name]["motivation"] for name in st.session_state.obs_active_students)
             total_prog = sum(st.session_state.student_states[name]["progress"] for name in st.session_state.obs_active_students)
@@ -258,14 +330,12 @@ def render_observation_room(df, cohort):
             with dash_col2: st.metric("Class Average Progress", f"{avg_prog}%")
             with dash_col3: st.metric("Students Monitored", len(st.session_state.obs_active_students))
             
-            # --- NEW: WHOLE CLASS BROADCASTING ---
             st.markdown("### 📢 Broadcast to Class")
             st.caption("Address the entire room at once. Use this to reset focus, give a time warning, or clarify the task.")
             
             class_announcement = st.chat_input("Speak to the entire class...")
             if class_announcement:
                 with st.spinner("The class is processing your announcement..."):
-                    # Build lightweight profiles to send to the AI
                     profiles_str = "\n".join([f"- {name} (Mot: {st.session_state.student_states[name]['motivation']}%)" for name in st.session_state.obs_active_students])
                     
                     broadcast_prompt = (
@@ -274,10 +344,8 @@ def render_observation_room(df, cohort):
                         "CRITICAL RULES:\n"
                         "1. Evaluate the pedagogical impact of this announcement. Does it inspire, panic, or refocus them?\n"
                         "2. Create a 'delta' (-20 to +30) showing how it affects EACH student's motivation based on their current state.\n"
-                        "3. Write a 1-sentence 'reaction' for each student (e.g., '*nods and speeds up*', or '*rolls eyes*').\n"
+                        "3. Write a 1-sentence 'reaction' for each student (e.g., '*nods and speeds up*').\n"
                         "4. Return ONLY a JSON dictionary where the keys are student names, and the values are dictionaries containing 'delta' and 'reaction'.\n"
-                        "Example Format:\n"
-                        "{\"Bella\": {\"delta\": 15, \"reaction\": \"*sits up straighter*\"}, \"Oscar\": {\"delta\": -5, \"reaction\": \"*groans quietly*\"}}"
                     )
                     
                     try:
@@ -286,7 +354,6 @@ def render_observation_room(df, cohort):
                         raw_text = response.text.replace("```json", "").replace("```", "")
                         reaction_data = json.loads(raw_text.strip())
                         
-                        # Apply the global updates
                         for name, data in reaction_data.items():
                             if name in st.session_state.student_states:
                                 current_m = st.session_state.student_states[name]["motivation"]
@@ -295,8 +362,6 @@ def render_observation_room(df, cohort):
                                 st.session_state.live_observations[name] = data.get("reaction", "Listened.")
                         
                         st.success(f"📣 You said: '{class_announcement}' — The room has reacted.")
-                        # We do not rerun instantly so the teacher can read the success message, 
-                        # the grid below will automatically update with the new stats!
                         
                     except Exception as e:
                         st.error(f"Failed to process class announcement: {e}")
