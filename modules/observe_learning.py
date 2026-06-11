@@ -158,7 +158,7 @@ def render_observation_room(df, cohort):
         
         col_dur, col_up = st.columns(2)
         with col_dur:
-            task_duration = st.slider("Expected Task Duration (Minutes):", min_value=5, max_value=60, value=st.session_state.obs_task_duration, step=5)
+            task_duration = st.number_input("Expected Task Duration (Minutes):", min_value=5, max_value=120, value=st.session_state.obs_task_duration, step=5)
         with col_up:
             uploaded_file = st.file_uploader("Upload reference resource (Optional)", type=['png', 'jpg', 'jpeg'])
             
@@ -201,13 +201,22 @@ def render_observation_room(df, cohort):
         with col2:
             if st.session_state.obs_active_students:
                 
-                # --- NEW: SIDE-BY-SIDE ACTION BUTTONS ---
+                # --- NEW: PERCENTAGE TIME CONTROLS ---
+                st.markdown("### ⚙️ Time Controls")
+                advance_pct = st.slider("Advance Time (% of Total Duration):", min_value=5, max_value=100, value=10, step=5)
+                
+                # Calculate exactly how many minutes this percentage represents
+                step_minutes = round((advance_pct / 100.0) * st.session_state.obs_task_duration, 1)
+                
+                # Math multiplier so behavior decays and progress accelerates appropriately based on the step size
+                time_multiplier = step_minutes / 5.0 
+                
                 act_col1, act_col2 = st.columns(2)
                 
                 with act_col1:
                     if st.session_state.obs_time_elapsed == 0:
-                        if st.button("👀 Watch Class Start (Simulate First 5 Mins)", type="secondary", use_container_width=True):
-                            st.session_state.obs_time_elapsed += 5
+                        if st.button(f"👀 Watch Class Start (First {advance_pct}%)", type="secondary", use_container_width=True):
+                            st.session_state.obs_time_elapsed += step_minutes
                             
                             profiles = []
                             for name in st.session_state.obs_active_students:
@@ -216,13 +225,13 @@ def render_observation_room(df, cohort):
                             
                             start_prompt = (
                                 f"Task: '{current_task}'\n"
-                                "The teacher has just said 'Go!'. We are simulating the critical first 5 minutes.\n"
+                                f"The teacher has just said 'Go!'. We are simulating the critical first {step_minutes} minutes.\n"
                                 f"Current Class Profiles:\n{chr(10).join(profiles)}\n\n"
                                 "CRITICAL RULES:\n"
                                 "1. Determine exactly when each student engages with the task based on their motivation.\n"
                                 "   - Motivation >70: Engages immediately (0:00 to 0:45).\n"
                                 "   - Motivation 40-70: Delayed start (1:00 to 3:30).\n"
-                                "   - Motivation <40: Fails to start within 5 minutes (return 'Failed').\n"
+                                f"   - Motivation <40: Fails to start within {step_minutes} minutes (return 'Failed').\n"
                                 "2. Provide a 1-sentence description of their start-up behavior.\n"
                                 "3. Return ONLY a JSON dictionary where keys are names and values are dicts containing 'time' and 'desc'.\n"
                             )
@@ -242,21 +251,30 @@ def render_observation_room(df, cohort):
                                     for name, data in log_data.items():
                                         st.session_state.live_observations[name] = data.get("desc", "")
                                         if data.get("time") != "Failed":
-                                            st.session_state.student_states[name]["progress"] += random.randint(5, 15)
+                                            # Scale the progress jump based on how big the percentage step was
+                                            prog_amount = int(random.randint(5, 15) * time_multiplier)
+                                            st.session_state.student_states[name]["progress"] = min(100, st.session_state.student_states[name]["progress"] + prog_amount)
                                             
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Failed to track start: {e}")
                                     
                     else:
-                        if st.button("⏱️ Advance Time (5 Mins) & Scan Room", use_container_width=True):
-                            st.session_state.obs_time_elapsed += 5
+                        if st.button(f"⏱️ Advance Time ({advance_pct}%) & Scan Room", use_container_width=True):
+                            st.session_state.obs_time_elapsed += step_minutes
+                            if st.session_state.obs_time_elapsed > st.session_state.obs_task_duration:
+                                st.session_state.obs_time_elapsed = st.session_state.obs_task_duration
                             
                             for name in st.session_state.obs_active_students:
                                 stats = st.session_state.student_states[name]
-                                stats["motivation"] = max(0, stats["motivation"] - stats["decay_rate"])
+                                
+                                # Scale the decay amount mathematically to match the time step
+                                decay_amount = int(stats["decay_rate"] * time_multiplier)
+                                stats["motivation"] = max(0, stats["motivation"] - decay_amount)
+                                
                                 if stats["motivation"] > 40:
-                                    stats["progress"] = min(100, stats["progress"] + random.randint(10, 25))
+                                    prog_amount = int(random.randint(10, 25) * time_multiplier)
+                                    stats["progress"] = min(100, stats["progress"] + prog_amount)
 
                             profiles = []
                             for name in st.session_state.obs_active_students:
@@ -285,13 +303,11 @@ def render_observation_room(df, cohort):
                                 except Exception as e:
                                     st.error(f"Failed scan: {e}")
 
-                # --- NEW RESTART BUTTON ---
                 with act_col2:
                     if st.button("🔄 Restart Activity (Reset Clock & Drive)", use_container_width=True):
                         st.session_state.obs_time_elapsed = 0
                         st.session_state.obs_engagement_log = None
                         
-                        # Re-roll their starting motivation and progress
                         for name in st.session_state.obs_active_students:
                             row = df[df["Full Name"] == name].iloc[0]
                             grade = get_flexible_text(row, ["Projected Grade", "Predicted Grade"])
@@ -313,10 +329,9 @@ def render_observation_room(df, cohort):
             
             progress_fraction = min(1.0, st.session_state.obs_time_elapsed / st.session_state.obs_task_duration)
             st.progress(progress_fraction)
-            st.markdown(f"<div style='text-align: center; font-weight: bold; margin-bottom: 20px; color: #555;'>⏱️ Time Elapsed: {st.session_state.obs_time_elapsed} / {st.session_state.obs_task_duration} Minutes</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: center; font-weight: bold; margin-bottom: 20px; color: #555;'>⏱️ Time Elapsed: {st.session_state.obs_time_elapsed:g} / {st.session_state.obs_task_duration:g} Minutes</div>", unsafe_allow_html=True)
             
-            if st.session_state.obs_engagement_log is not None and st.session_state.obs_time_elapsed == 5:
-                st.success("The first 5 minutes have passed. Review the Engagement Tracker below.")
+            if st.session_state.obs_engagement_log is not None:
                 with st.expander("📋 Latency to Engage (Start-up Tracker)", expanded=True):
                     col_fast, col_slow, col_fail = st.columns(3)
                     with col_fast:
