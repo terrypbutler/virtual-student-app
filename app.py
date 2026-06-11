@@ -360,7 +360,44 @@ elif page == "Lesson Stress-Tester":
     from modules.lesson_stress_tester import render_stress_tester
     render_stress_tester(filtered_df, cohort, selected_subject)
 
-# In your app.py page routing section:
 elif page == "Observe Learning":
+    # 1. Select the base data
+    cohort = st.radio("Select Class:", ["Year 7", "Year 10"], horizontal=True)
+    df_base = df_y7 if cohort == "Year 7" else df_y10
+
+    # 2. Build the sidebar filters (Mirroring the AfL & Stress-Tester tabs)
+    st.sidebar.subheader(f"🔎 Class Setup ({cohort})")
+    all_subjects = ["Maths", "Science", "English", "Art", "Computing", "Design", "Drama", "Geography", "History", "Hospitality", "Music", "Photography", "Spanish", "Sport"]
+    selected_subject = st.sidebar.selectbox("Subject:", all_subjects, key="obs_sub")
+    
+    filtered_df = df_base.copy()
+    
+    # --- Explicit Grouping Choice for Maths & Science ---
+    if selected_subject in ["Maths", "Science"]:
+        grouping_style = st.sidebar.radio("Class Grouping:", ["Streamed Sets", "Mixed Ability (Tutor Groups)"], key="obs_grouping")
+        
+        if grouping_style == "Streamed Sets":
+            available_sets = safe_unique(df_base, "Maths Set")
+            selected_set = st.sidebar.selectbox("Select Class Set:", available_sets, key="obs_set")
+            filtered_df = filtered_df[filtered_df["Maths Set"].astype(str) == selected_set]
+        else:
+            available_forms = safe_unique(df_base, "Form Group")
+            selected_form = st.sidebar.selectbox("Select Mixed Group:", ["Whole Cohort"] + available_forms, key="obs_mixed_form")
+            if selected_form != "Whole Cohort":
+                filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+                
+    else:
+        available_forms = safe_unique(df_base, "Form Group")
+        selected_form = st.sidebar.selectbox("Select Tutor Group:", ["All Tutor Groups"] + available_forms, key="obs_form")
+        if selected_form != "All Tutor Groups":
+            filtered_df = filtered_df[filtered_df["Form Group"].astype(str) == selected_form]
+
+    # Smart Option-Block Filtering (Year 10 Only)
+    if cohort == "Year 10" and selected_subject in df_base.columns and selected_subject not in ["Maths", "Science", "English"]:
+        filtered_df = filtered_df[filtered_df[selected_subject].notna() & (filtered_df[selected_subject].astype(str).str.strip() != "")]
+
+    st.sidebar.info(f"**Current Class Size:** {len(filtered_df)} students")
+
+    # 3. Render the module using the newly created filtered_df!
     from modules.observe_learning import render_observation_room
     render_observation_room(filtered_df, cohort)
