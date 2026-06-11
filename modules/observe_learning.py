@@ -44,6 +44,7 @@ def render_observation_room(df, cohort):
     if "obs_task_duration" not in st.session_state: st.session_state.obs_task_duration = 30
     if "obs_time_elapsed" not in st.session_state: st.session_state.obs_time_elapsed = 0
     if "obs_engagement_log" not in st.session_state: st.session_state.obs_engagement_log = None
+    if "obs_global_event" not in st.session_state: st.session_state.obs_global_event = None
     
     if "student_states" not in st.session_state: st.session_state.student_states = {}
 
@@ -57,6 +58,8 @@ def render_observation_room(df, cohort):
         
         with st.container(border=True):
             st.markdown(f"**Current Task:** {st.session_state.obs_task}")
+            if st.session_state.obs_global_event:
+                st.warning(f"**Current Room Event:** {st.session_state.obs_global_event}")
             if st.session_state.obs_image is not None:
                 with st.expander("🖼️ View Uploaded Task Resource"):
                     st.image(st.session_state.obs_image, use_container_width=True)
@@ -96,10 +99,16 @@ def render_observation_room(df, cohort):
                 
                 transcript = "\n".join([f"{'Teacher' if m['role']=='user' else target_name}: {m['content']}" for m in st.session_state[chat_key]])
 
+                # Inject context if a spontaneous event caused this intervention
+                event_context = ""
+                if "hand up" in observation.lower() or "complaining" in observation.lower() or "toilet" in observation.lower():
+                    event_context = f"Remember, right before the teacher approached, you were doing this: '{observation}'. Address this in your response.\n"
+
                 system_prompt = (
                     f"You are roleplaying as a {age}-year-old UK student named {target_name}.\n"
                     f"Data: SEN: {sen} | EAL: {eal} | Grade: {grade} | Suspensions: {susp}\n"
                     f"Task: '{st.session_state.obs_task}'\n"
+                    f"{event_context}"
                     f"Your current internal motivation level is {current_mot}/100.\n\n"
                     f"Transcript:\n{transcript}\n\n"
                     "CRITICAL RULES:\n"
@@ -126,6 +135,9 @@ def render_observation_room(df, cohort):
                         
                         new_mot = min(100, max(0, current_mot + delta))
                         st.session_state.student_states[target_name]["motivation"] = new_mot
+                        
+                        # Clear the current event/status so they go back to work
+                        st.session_state.student_states[target_name]["current_event"] = None
                         
                         if delta > 0:
                             st.success(f"📈 Motivation increased by {delta}% (Now {new_mot}%)")
@@ -176,6 +188,7 @@ def render_observation_room(df, cohort):
                 st.session_state.obs_task_duration = task_duration
                 st.session_state.obs_time_elapsed = 0
                 st.session_state.obs_engagement_log = None 
+                st.session_state.obs_global_event = None
                 
                 if uploaded_file is not None:
                     st.session_state.obs_image = Image.open(uploaded_file)
@@ -192,7 +205,8 @@ def render_observation_room(df, cohort):
                     st.session_state.student_states[name] = {
                         "motivation": random.randint(60, 90) if "7" in grade or "8" in grade or "9" in grade else random.randint(30, 60),
                         "progress": 0,
-                        "decay_rate": random.randint(10, 20) if sen and sen.upper() != "NONE" else random.randint(5, 12)
+                        "decay_rate": random.randint(10, 20) if sen and sen.upper() != "NONE" else random.randint(5, 12),
+                        "current_event": None
                     }
                 
                 st.session_state.live_observations = {name: "Waiting for task to begin." for name in st.session_state.obs_active_students}
@@ -201,14 +215,10 @@ def render_observation_room(df, cohort):
         with col2:
             if st.session_state.obs_active_students:
                 
-                # --- NEW: PERCENTAGE TIME CONTROLS ---
                 st.markdown("### ⚙️ Time Controls")
                 advance_pct = st.slider("Advance Time (% of Total Duration):", min_value=5, max_value=100, value=10, step=5)
                 
-                # Calculate exactly how many minutes this percentage represents
                 step_minutes = round((advance_pct / 100.0) * st.session_state.obs_task_duration, 1)
-                
-                # Math multiplier so behavior decays and progress accelerates appropriately based on the step size
                 time_multiplier = step_minutes / 5.0 
                 
                 act_col1, act_col2 = st.columns(2)
@@ -251,7 +261,6 @@ def render_observation_room(df, cohort):
                                     for name, data in log_data.items():
                                         st.session_state.live_observations[name] = data.get("desc", "")
                                         if data.get("time") != "Failed":
-                                            # Scale the progress jump based on how big the percentage step was
                                             prog_amount = int(random.randint(5, 15) * time_multiplier)
                                             st.session_state.student_states[name]["progress"] = min(100, st.session_state.student_states[name]["progress"] + prog_amount)
                                             
@@ -265,29 +274,67 @@ def render_observation_room(df, cohort):
                             if st.session_state.obs_time_elapsed > st.session_state.obs_task_duration:
                                 st.session_state.obs_time_elapsed = st.session_state.obs_task_duration
                             
+                            # --- 1. THE RANDOM EVENT ENGINE ---
+                            st.session_state.obs_global_event = None
+                            global_prompt_injection = ""
+                            
+                            # 100-sided dice for Global Events
+                            dice_roll = random.randint(1, 100)
+                            if dice_roll <= 2:
+                                st.session_state.obs_global_event = "It has started snowing heavily outside the window."
+                                global_prompt_injection = f"URGENT GLOBAL EVENT: {st.session_state.obs_global_event} Everyone is distracted."
+                                st.toast("❄️ It started snowing!", icon="❄️")
+                            elif dice_roll <= 5:
+                                st.session_state.obs_global_event = "A large wasp has flown into the classroom."
+                                global_prompt_injection = f"URGENT GLOBAL EVENT: {st.session_state.obs_global_event} Students are reacting or panicking."
+                                st.toast("🐝 A wasp flew in!", icon="🐝")
+
+                            # --- 2. UPDATE STUDENT STATS & INDIVIDUAL EVENTS ---
                             for name in st.session_state.obs_active_students:
                                 stats = st.session_state.student_states[name]
+                                stats["current_event"] = None
                                 
-                                # Scale the decay amount mathematically to match the time step
-                                decay_amount = int(stats["decay_rate"] * time_multiplier)
-                                stats["motivation"] = max(0, stats["motivation"] - decay_amount)
+                                # Global events instantly crash motivation
+                                if st.session_state.obs_global_event:
+                                    stats["motivation"] = max(0, stats["motivation"] - random.randint(20, 40))
+                                else:
+                                    # Normal time decay
+                                    decay_amount = int(stats["decay_rate"] * time_multiplier)
+                                    stats["motivation"] = max(0, stats["motivation"] - decay_amount)
                                 
+                                # Progress calculation
                                 if stats["motivation"] > 40:
                                     prog_amount = int(random.randint(10, 25) * time_multiplier)
                                     stats["progress"] = min(100, stats["progress"] + prog_amount)
 
+                                # Individual Random Events (Only if there is no global panic)
+                                if not st.session_state.obs_global_event:
+                                    indiv_roll = random.randint(1, 100)
+                                    if indiv_roll <= 5:
+                                        stats["current_event"] = "Has their hand up asking to go to the toilet."
+                                    elif indiv_roll <= 12 and stats["motivation"] > 60:
+                                        stats["current_event"] = "Has their hand up asking the teacher for help or clarification."
+                                    elif indiv_roll <= 18 and stats["motivation"] < 50:
+                                        stats["current_event"] = "Is visibly complaining that another student is distracting them."
+
+                            # --- 3. BUILD PROMPT WITH EVENTS INCLUDED ---
                             profiles = []
                             for name in st.session_state.obs_active_students:
                                 mot = st.session_state.student_states[name]["motivation"]
                                 prog = st.session_state.student_states[name]["progress"]
-                                profiles.append(f"- {name} | Motivation: {mot}% | Progress: {prog}%")
+                                evt = st.session_state.student_states[name].get("current_event")
+                                evt_string = f" | STATUS: {evt}" if evt else ""
+                                profiles.append(f"- {name} | Motivation: {mot}% | Progress: {prog}%{evt_string}")
                             
                             obs_prompt = (
                                 f"Task: '{current_task}'\n"
-                                f"Generate a 1-sentence physical observation of each student based on their numbers.\n"
+                                f"{global_prompt_injection}\n"
+                                f"Generate a 1-sentence physical observation of each student based on their numbers and STATUS.\n"
                                 f"{chr(10).join(profiles)}\n\n"
-                                "RULES: If motivation > 70%, focused. If 40-70%, distracted. If <40%, off-task. If progress 100%, finished.\n"
-                                "Return a ONLY a raw JSON dict with names as keys and observations as values."
+                                "RULES:\n"
+                                "1. If a student has a specific 'STATUS' (like hand up or complaining), your observation MUST describe them doing that action.\n"
+                                "2. Otherwise, if motivation > 70%, they are focused. If 40-70%, distracted. If <40%, off-task. If progress 100%, finished.\n"
+                                "3. Return ONLY a raw JSON dict with names as keys and observations as values."
                             )
                             
                             with st.spinner(f"Scanning {len(st.session_state.obs_active_students)} students..."):
@@ -307,6 +354,7 @@ def render_observation_room(df, cohort):
                     if st.button("🔄 Restart Activity (Reset Clock & Drive)", use_container_width=True):
                         st.session_state.obs_time_elapsed = 0
                         st.session_state.obs_engagement_log = None
+                        st.session_state.obs_global_event = None
                         
                         for name in st.session_state.obs_active_students:
                             row = df[df["Full Name"] == name].iloc[0]
@@ -316,7 +364,8 @@ def render_observation_room(df, cohort):
                             st.session_state.student_states[name] = {
                                 "motivation": random.randint(60, 90) if "7" in grade or "8" in grade or "9" in grade else random.randint(30, 60),
                                 "progress": 0,
-                                "decay_rate": random.randint(10, 20) if sen and sen.upper() != "NONE" else random.randint(5, 12)
+                                "decay_rate": random.randint(10, 20) if sen and sen.upper() != "NONE" else random.randint(5, 12),
+                                "current_event": None
                             }
                         
                         st.session_state.live_observations = {name: "Waiting for task to begin." for name in st.session_state.obs_active_students}
@@ -327,12 +376,15 @@ def render_observation_room(df, cohort):
         # SECTION B: Live Class Dashboard
         if st.session_state.obs_active_students:
             
+            if st.session_state.obs_global_event:
+                st.error(f"🚨 **Attention!** {st.session_state.obs_global_event}")
+
             progress_fraction = min(1.0, st.session_state.obs_time_elapsed / st.session_state.obs_task_duration)
             st.progress(progress_fraction)
             st.markdown(f"<div style='text-align: center; font-weight: bold; margin-bottom: 20px; color: #555;'>⏱️ Time Elapsed: {st.session_state.obs_time_elapsed:g} / {st.session_state.obs_task_duration:g} Minutes</div>", unsafe_allow_html=True)
             
             if st.session_state.obs_engagement_log is not None:
-                with st.expander("📋 Latency to Engage (Start-up Tracker)", expanded=True):
+                with st.expander("📋 Latency to Engage (Start-up Tracker)", expanded=False):
                     col_fast, col_slow, col_fail = st.columns(3)
                     with col_fast:
                         st.markdown("🟢 **Immediate Start**")
@@ -372,13 +424,15 @@ def render_observation_room(df, cohort):
                 with st.spinner("The class is processing your announcement..."):
                     profiles_str = "\n".join([f"- {name} (Mot: {st.session_state.student_states[name]['motivation']}%)" for name in st.session_state.obs_active_students])
                     
+                    # If there's an active global event, we assume the teacher is addressing it. 
+                    # Once addressed, we clear the event.
                     broadcast_prompt = (
                         f"The teacher just addressed the entire class aloud: '{class_announcement}'\n\n"
                         f"Current Class Profiles:\n{profiles_str}\n\n"
                         "CRITICAL RULES:\n"
                         "1. Evaluate the pedagogical impact of this announcement. Does it inspire, panic, or refocus them?\n"
                         "2. Create a 'delta' (-20 to +30) showing how it affects EACH student's motivation based on their current state.\n"
-                        "3. Write a 1-sentence 'reaction' for each student (e.g., '*nods and speeds up*').\n"
+                        "3. Write a 1-sentence 'reaction' for each student.\n"
                         "4. Return ONLY a JSON dictionary where the keys are student names, and the values are dictionaries containing 'delta' and 'reaction'.\n"
                     )
                     
@@ -394,6 +448,9 @@ def render_observation_room(df, cohort):
                                 delta = data.get("delta", 0)
                                 st.session_state.student_states[name]["motivation"] = min(100, max(0, current_m + delta))
                                 st.session_state.live_observations[name] = data.get("reaction", "Listened.")
+                        
+                        # Clear global event once addressed
+                        st.session_state.obs_global_event = None
                         
                         st.success(f"📣 You said: '{class_announcement}' — The room has reacted.")
                         
@@ -416,6 +473,10 @@ def render_observation_room(df, cohort):
                             
                             mot_color = "🟢" if stats["motivation"] > 65 else "🟡" if stats["motivation"] > 35 else "🔴"
                             st.caption(f"{mot_color} **Drive:** {stats['motivation']}% | 📋 **Done:** {stats['progress']}%")
+                            
+                            # Highlight students who have an active individual event 
+                            if stats.get("current_event"):
+                                st.warning(f"🙋 **{stats['current_event']}**")
                             
                             obs_text = st.session_state.live_observations.get(student_name, "Waiting for scan...")
                             st.info(f"*{obs_text}*")
