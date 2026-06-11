@@ -41,9 +41,13 @@ def render_observation_room(df, cohort):
     if "obs_intervene_target" not in st.session_state: st.session_state.obs_intervene_target = None
     if "obs_active_students" not in st.session_state: st.session_state.obs_active_students = []
     
+    # NEW: Global Timer Variables
+    if "obs_task_duration" not in st.session_state: st.session_state.obs_task_duration = 30
+    if "obs_time_elapsed" not in st.session_state: st.session_state.obs_time_elapsed = 0
+    
     if "student_states" not in st.session_state: st.session_state.student_states = {}
 
-    # --- 2. THE INTERVENTION VIEW ---
+    # --- 2. THE 1-ON-1 INTERVENTION VIEW ---
     if st.session_state.obs_intervene_target:
         target_name = st.session_state.obs_intervene_target
         observation = st.session_state.live_observations.get(target_name, "")
@@ -51,7 +55,6 @@ def render_observation_room(df, cohort):
         
         st.markdown(f"### 🛑 Intervening with {target_name}")
         
-        # Show the task and the image if one was uploaded
         with st.container(border=True):
             st.markdown(f"**Current Task:** {st.session_state.obs_task}")
             if st.session_state.obs_image is not None:
@@ -97,46 +100,39 @@ def render_observation_room(df, cohort):
                     f"You are roleplaying as a {age}-year-old UK student named {target_name}.\n"
                     f"Data: SEN: {sen} | EAL: {eal} | Grade: {grade} | Suspensions: {susp}\n"
                     f"Task: '{st.session_state.obs_task}'\n"
-                    f"Note: An image/resource was also provided for this task (see attached).\n"
                     f"Your current internal motivation level is {current_mot}/100.\n\n"
                     f"Transcript:\n{transcript}\n\n"
                     "CRITICAL RULES:\n"
                     "1. Evaluate the teacher's last statement. Is it specific praise, helpful scaffolding, dismissive, or overly harsh?\n"
                     "2. Based on their pedagogy, determine how this affects your motivation. Create a 'motivation_delta' integer between -25 (terrible) and +35 (great).\n"
-                    f"3. Respond verbally as {target_name}. Include non-verbal actions in asterisks (e.g., *smiles*, *looks away*). Reference the specific details of the uploaded resource if relevant to your struggle or success.\n"
+                    f"3. Respond verbally as {target_name}. Include non-verbal actions in asterisks.\n"
                     "4. Pick ONE emotion: [neutral, defensive, embarrassed, frustrated, bored, proud, eager].\n"
-                    "5. Return ONLY a raw JSON object with keys: \"dialogue\", \"emotion\", and \"motivation_delta\".\n\n"
-                    "Example:\n"
-                    "{\"dialogue\": \"*points at worksheet* I just don't get this part here.\", \"emotion\": \"frustrated\", \"motivation_delta\": 5}"
+                    "5. Return ONLY a raw JSON object with keys: \"dialogue\", \"emotion\", and \"motivation_delta\".\n"
                 )
 
                 with st.spinner(f"{target_name} is reacting..."):
                     try:
                         model = genai.GenerativeModel('gemini-2.5-flash')
-                        
-                        # --- MULTIMODAL INJECTION ---
                         contents = [system_prompt]
                         if st.session_state.obs_image is not None:
                             contents.append(st.session_state.obs_image)
                             
                         response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
-                        
                         raw_text = response.text.replace("```json", "").replace("```", "")
                         ai_data = json.loads(raw_text.strip())
 
                         display_text = ai_data.get("dialogue", "...")
-                        current_emotion = ai_data.get("emotion", "neutral")
                         delta = int(ai_data.get("motivation_delta", 0))
                         
                         new_mot = min(100, max(0, current_mot + delta))
                         st.session_state.student_states[target_name]["motivation"] = new_mot
                         
                         if delta > 0:
-                            st.success(f"📈 Great pedagogy! Motivation increased by {delta}% (Now {new_mot}%)")
+                            st.success(f"📈 Motivation increased by {delta}% (Now {new_mot}%)")
                         elif delta < 0:
-                            st.error(f"📉 That missed the mark. Motivation dropped by {abs(delta)}% (Now {new_mot}%)")
+                            st.error(f"📉 Motivation dropped by {abs(delta)}% (Now {new_mot}%)")
                         else:
-                            st.info(f"➖ Neutral interaction. Motivation unchanged.")
+                            st.info(f"➖ Neutral interaction.")
                         
                     except Exception as e:
                         st.error(f"Gemini Error: {e}")
@@ -155,15 +151,21 @@ def render_observation_room(df, cohort):
                         
                 st.rerun()
 
-    # --- 3. THE ROOM VIEW ---
+    # --- 3. THE FULL ROOM VIEW ---
     else:
+        # SECTION A: Task Initialization
         st.markdown("### 1. Set the Independent Task")
-        current_task = st.text_area("Describe the task:", placeholder="e.g., 'Copy the perspective drawing shown in the resource.'", value=st.session_state.obs_task)
+        current_task = st.text_area("Describe the task:", placeholder="e.g., 'Copy the perspective drawing.'", value=st.session_state.obs_task)
         
-        # --- NEW IMAGE UPLOADER ---
-        uploaded_file = st.file_uploader("Upload a resource, worksheet, or reference image (Optional)", type=['png', 'jpg', 'jpeg'])
+        col_dur, col_up = st.columns(2)
+        with col_dur:
+            # NEW: Duration Slider
+            task_duration = st.slider("Expected Task Duration (Minutes):", min_value=5, max_value=60, value=st.session_state.obs_task_duration, step=5)
+        with col_up:
+            uploaded_file = st.file_uploader("Upload reference resource (Optional)", type=['png', 'jpg', 'jpeg'])
+            
         if uploaded_file is not None:
-            st.image(uploaded_file, caption="Resource preview", use_container_width=True)
+            st.image(uploaded_file, caption="Resource preview", width=300)
         
         col1, col2 = st.columns([1, 4])
         with col1:
@@ -173,8 +175,9 @@ def render_observation_room(df, cohort):
                     st.stop()
                     
                 st.session_state.obs_task = current_task
+                st.session_state.obs_task_duration = task_duration
+                st.session_state.obs_time_elapsed = 0
                 
-                # Save the image to session state so the AI can "remember" it during interventions
                 if uploaded_file is not None:
                     st.session_state.obs_image = Image.open(uploaded_file)
                 else:
@@ -199,6 +202,9 @@ def render_observation_room(df, cohort):
         with col2:
             if st.session_state.obs_active_students:
                 if st.button("⏱️ Advance Time (5 Mins) & Scan Full Room", use_container_width=True):
+                    # Update global clock
+                    st.session_state.obs_time_elapsed += 5
+                    
                     for name in st.session_state.obs_active_students:
                         stats = st.session_state.student_states[name]
                         stats["motivation"] = max(0, stats["motivation"] - stats["decay_rate"])
@@ -213,21 +219,17 @@ def render_observation_room(df, cohort):
                     
                     obs_prompt = (
                         f"Task: '{current_task}'\n"
-                        f"Note: The teacher also provided an image/resource for this task (see attached).\n"
                         f"Generate a 1-sentence physical observation of each student based on their numbers.\n"
                         f"{chr(10).join(profiles)}\n\n"
-                        "RULES: If motivation > 70%, they are focused (reference them successfully engaging with specific elements of the resource). If 40-70%, they are slowing down/distracted. If <40%, they are completely off-task or acting out. If progress is 100%, they are finished.\n"
+                        "RULES: If motivation > 70%, they are focused. If 40-70%, they are distracted. If <40%, they are completely off-task. If progress is 100%, they are finished.\n"
                         "Return a ONLY a raw JSON dict with names as keys and observations as values."
                     )
                     
                     with st.spinner(f"Scanning {len(st.session_state.obs_active_students)} students..."):
                         try:
                             model = genai.GenerativeModel('gemini-2.5-flash')
-                            
-                            # --- MULTIMODAL INJECTION ---
                             contents = [obs_prompt]
-                            if st.session_state.obs_image is not None:
-                                contents.append(st.session_state.obs_image)
+                            if st.session_state.obs_image is not None: contents.append(st.session_state.obs_image)
                                 
                             response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
                             raw_text = response.text.replace("```json", "").replace("```", "")
@@ -238,8 +240,13 @@ def render_observation_room(df, cohort):
 
         st.markdown("---")
 
+        # SECTION B: Live Class Dashboard & Broadcasting
         if st.session_state.obs_active_students:
-            st.markdown("### 2. Live Room Status")
+            
+            # --- GLOBAL TIMER DISPLAY ---
+            progress_fraction = min(1.0, st.session_state.obs_time_elapsed / st.session_state.obs_task_duration)
+            st.progress(progress_fraction)
+            st.markdown(f"<div style='text-align: center; font-weight: bold; margin-bottom: 20px; color: #555;'>⏱️ Time Elapsed: {st.session_state.obs_time_elapsed} / {st.session_state.obs_task_duration} Minutes</div>", unsafe_allow_html=True)
             
             total_mot = sum(st.session_state.student_states[name]["motivation"] for name in st.session_state.obs_active_students)
             total_prog = sum(st.session_state.student_states[name]["progress"] for name in st.session_state.obs_active_students)
@@ -247,15 +254,56 @@ def render_observation_room(df, cohort):
             avg_prog = int(total_prog / len(st.session_state.obs_active_students))
             
             dash_col1, dash_col2, dash_col3 = st.columns(3)
-            with dash_col1:
-                st.metric("Class Average Motivation", f"{avg_mot}%")
-            with dash_col2:
-                st.metric("Class Average Progress", f"{avg_prog}%")
-            with dash_col3:
-                st.metric("Students Monitored", len(st.session_state.obs_active_students))
-                
+            with dash_col1: st.metric("Class Average Motivation", f"{avg_mot}%")
+            with dash_col2: st.metric("Class Average Progress", f"{avg_prog}%")
+            with dash_col3: st.metric("Students Monitored", len(st.session_state.obs_active_students))
+            
+            # --- NEW: WHOLE CLASS BROADCASTING ---
+            st.markdown("### 📢 Broadcast to Class")
+            st.caption("Address the entire room at once. Use this to reset focus, give a time warning, or clarify the task.")
+            
+            class_announcement = st.chat_input("Speak to the entire class...")
+            if class_announcement:
+                with st.spinner("The class is processing your announcement..."):
+                    # Build lightweight profiles to send to the AI
+                    profiles_str = "\n".join([f"- {name} (Mot: {st.session_state.student_states[name]['motivation']}%)" for name in st.session_state.obs_active_students])
+                    
+                    broadcast_prompt = (
+                        f"The teacher just addressed the entire class aloud: '{class_announcement}'\n\n"
+                        f"Current Class Profiles:\n{profiles_str}\n\n"
+                        "CRITICAL RULES:\n"
+                        "1. Evaluate the pedagogical impact of this announcement. Does it inspire, panic, or refocus them?\n"
+                        "2. Create a 'delta' (-20 to +30) showing how it affects EACH student's motivation based on their current state.\n"
+                        "3. Write a 1-sentence 'reaction' for each student (e.g., '*nods and speeds up*', or '*rolls eyes*').\n"
+                        "4. Return ONLY a JSON dictionary where the keys are student names, and the values are dictionaries containing 'delta' and 'reaction'.\n"
+                        "Example Format:\n"
+                        "{\"Bella\": {\"delta\": 15, \"reaction\": \"*sits up straighter*\"}, \"Oscar\": {\"delta\": -5, \"reaction\": \"*groans quietly*\"}}"
+                    )
+                    
+                    try:
+                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        response = model.generate_content(broadcast_prompt, generation_config={"response_mime_type": "application/json"})
+                        raw_text = response.text.replace("```json", "").replace("```", "")
+                        reaction_data = json.loads(raw_text.strip())
+                        
+                        # Apply the global updates
+                        for name, data in reaction_data.items():
+                            if name in st.session_state.student_states:
+                                current_m = st.session_state.student_states[name]["motivation"]
+                                delta = data.get("delta", 0)
+                                st.session_state.student_states[name]["motivation"] = min(100, max(0, current_m + delta))
+                                st.session_state.live_observations[name] = data.get("reaction", "Listened.")
+                        
+                        st.success(f"📣 You said: '{class_announcement}' — The room has reacted.")
+                        # We do not rerun instantly so the teacher can read the success message, 
+                        # the grid below will automatically update with the new stats!
+                        
+                    except Exception as e:
+                        st.error(f"Failed to process class announcement: {e}")
+
             st.markdown("---")
             
+            # SECTION C: The Student Grid
             num_cols = 4
             for i in range(0, len(st.session_state.obs_active_students), num_cols):
                 cols = st.columns(num_cols)
