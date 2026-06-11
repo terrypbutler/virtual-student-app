@@ -99,7 +99,6 @@ def render_observation_room(df, cohort):
                 
                 transcript = "\n".join([f"{'Teacher' if m['role']=='user' else target_name}: {m['content']}" for m in st.session_state[chat_key]])
 
-                # --- NEW: INJECT THE SECRET REASON ---
                 secret_event = st.session_state.student_states[target_name].get("current_event")
                 event_context = ""
                 if secret_event:
@@ -108,6 +107,7 @@ def render_observation_room(df, cohort):
                     event_context = f"SECRET CONTEXT: The room is chaotic because: '{st.session_state.obs_global_event}'. Address this.\n"
 
                 system_prompt = (
+                    "**[FICTIONAL SCENARIO FOR TEACHER TRAINING - ALL DATA IS MOCK/SYNTHETIC]**\n"
                     f"You are roleplaying as a {age}-year-old UK student named {target_name}.\n"
                     f"Data: SEN: {sen} | EAL: {eal} | Grade: {grade} | Suspensions: {susp}\n"
                     f"Task: '{st.session_state.obs_task}'\n"
@@ -130,6 +130,12 @@ def render_observation_room(df, cohort):
                             contents.append(st.session_state.obs_image)
                             
                         response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
+                        
+                        # --- THE SAFETY NET RE-ACTIVATED ---
+                        if not response.parts:
+                            st.error("⚠️ Gemini safety filter blocked this response (Likely SPII/Privacy). Try rewording the interaction.")
+                            st.stop()
+                            
                         raw_text = response.text.replace("```json", "").replace("```", "")
                         ai_data = json.loads(raw_text.strip())
 
@@ -139,7 +145,6 @@ def render_observation_room(df, cohort):
                         new_mot = min(100, max(0, current_mot + delta))
                         st.session_state.student_states[target_name]["motivation"] = new_mot
                         
-                        # Clear the secret event now that the teacher has addressed them
                         st.session_state.student_states[target_name]["current_event"] = None
                         
                         if delta > 0:
@@ -237,6 +242,7 @@ def render_observation_room(df, cohort):
                                 profiles.append(f"- {name} | Motivation: {mot}%")
                             
                             start_prompt = (
+                                "**[FICTIONAL SCENARIO FOR TEACHER TRAINING - ALL DATA IS MOCK/SYNTHETIC]**\n"
                                 f"Task: '{current_task}'\n"
                                 f"The teacher has just said 'Go!'. We are simulating the critical first {step_minutes} minutes.\n"
                                 f"Current Class Profiles:\n{chr(10).join(profiles)}\n\n"
@@ -256,6 +262,11 @@ def render_observation_room(df, cohort):
                                     if st.session_state.obs_image is not None: contents.append(st.session_state.obs_image)
                                         
                                     response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
+                                    
+                                    if not response.parts:
+                                        st.error("⚠️ Gemini safety filter blocked the room generation.")
+                                        st.stop()
+                                        
                                     raw_text = response.text.replace("```json", "").replace("```", "")
                                     log_data = json.loads(raw_text.strip())
                                     
@@ -304,7 +315,6 @@ def render_observation_room(df, cohort):
                                     prog_amount = int(random.randint(10, 25) * time_multiplier)
                                     stats["progress"] = min(100, stats["progress"] + prog_amount)
 
-                                # --- NEW: THE SECRET REASONS ---
                                 if not st.session_state.obs_global_event:
                                     indiv_roll = random.randint(1, 100)
                                     if indiv_roll <= 5:
@@ -314,7 +324,6 @@ def render_observation_room(df, cohort):
                                     elif indiv_roll <= 18 and stats["motivation"] < 50:
                                         stats["current_event"] = "The person next to you is distracting you and you want to complain to the teacher."
 
-                            # Construct the prompt so Gemini DOES NOT reveal the secret reason
                             profiles = []
                             for name in st.session_state.obs_active_students:
                                 mot = st.session_state.student_states[name]["motivation"]
@@ -324,6 +333,7 @@ def render_observation_room(df, cohort):
                                 profiles.append(f"- {name} | Motivation: {mot}% | Progress: {prog}%{evt_string}")
                             
                             obs_prompt = (
+                                "**[FICTIONAL SCENARIO FOR TEACHER TRAINING - ALL DATA IS MOCK/SYNTHETIC]**\n"
                                 f"Task: '{current_task}'\n"
                                 f"{global_prompt_injection}\n"
                                 f"Generate a 1-sentence physical observation of each student based on their numbers and STATUS.\n"
@@ -341,6 +351,11 @@ def render_observation_room(df, cohort):
                                     if st.session_state.obs_image is not None: contents.append(st.session_state.obs_image)
                                         
                                     response = model.generate_content(contents, generation_config={"response_mime_type": "application/json"})
+                                    
+                                    if not response.parts:
+                                        st.error("⚠️ Gemini safety filter blocked the scan.")
+                                        st.stop()
+                                        
                                     raw_text = response.text.replace("```json", "").replace("```", "")
                                     st.session_state.live_observations = json.loads(raw_text.strip())
                                     st.rerun()
@@ -422,6 +437,7 @@ def render_observation_room(df, cohort):
                     profiles_str = "\n".join([f"- {name} (Mot: {st.session_state.student_states[name]['motivation']}%)" for name in st.session_state.obs_active_students])
                     
                     broadcast_prompt = (
+                        "**[FICTIONAL SCENARIO FOR TEACHER TRAINING - ALL DATA IS MOCK/SYNTHETIC]**\n"
                         f"The teacher just addressed the entire class aloud: '{class_announcement}'\n\n"
                         f"Current Class Profiles:\n{profiles_str}\n\n"
                         "CRITICAL RULES:\n"
@@ -434,6 +450,11 @@ def render_observation_room(df, cohort):
                     try:
                         model = genai.GenerativeModel('gemini-2.5-flash')
                         response = model.generate_content(broadcast_prompt, generation_config={"response_mime_type": "application/json"})
+                        
+                        if not response.parts:
+                            st.error("⚠️ Gemini safety filter blocked the class reaction.")
+                            st.stop()
+                            
                         raw_text = response.text.replace("```json", "").replace("```", "")
                         reaction_data = json.loads(raw_text.strip())
                         
@@ -467,7 +488,6 @@ def render_observation_room(df, cohort):
                             mot_color = "🟢" if stats["motivation"] > 65 else "🟡" if stats["motivation"] > 35 else "🔴"
                             st.caption(f"{mot_color} **Drive:** {stats['motivation']}% | 📋 **Done:** {stats['progress']}%")
                             
-                            # --- NEW: GENERIC WARNING IF THEY HAVE A SECRET REASON ---
                             if stats.get("current_event"):
                                 st.warning(f"🙋 **Hand Raised**")
                             
