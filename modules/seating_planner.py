@@ -1,4 +1,7 @@
-# ... (Keep all imports and helper functions exactly as they are) ...
+import streamlit as st
+import random
+import google.generativeai as genai
+from modules.photo_utils import display_student_photo
 
 def render_seating_plan(df, cohort):
     st.subheader("⚡ Visual Classroom Planner")
