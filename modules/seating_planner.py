@@ -44,22 +44,23 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             </div>
         """, unsafe_allow_html=True)
         
-        # UI Clean up: Just the plus emoji
-        if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
-            if next_student:
-                st.session_state.seats[seat_key] = next_student
-                st.rerun()
+        # UI Clean up: Centered the Plus button to match the populated seats
+        pad_l, btn, pad_r = st.columns([1, 4, 1])
+        with btn:
+            if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
+                if next_student:
+                    st.session_state.seats[seat_key] = next_student
+                    st.rerun()
     else:
         # NATIVE STREAMLIT RENDERING
         display_student_photo(current_val, cohort)
         
         dots = get_student_dots(current_val, df)
         
-        # IMPROVEMENT 1: Force perfect centering of the emojis using Flexbox
         dot_html = f"<div style='display: flex; justify-content: center; width: 100%; font-size: 14px; margin: 2px 0; min-height: 20px; letter-spacing: 2px;'>{dots if dots else ''}</div>"
         st.markdown(dot_html, unsafe_allow_html=True)
         
-        # IMPROVEMENT 2: The Heat-Map Routing
+        # The Heat-Map Routing
         if current_val in st.session_state.circulation_path:
             idx = st.session_state.circulation_path.index(current_val)
             total = len(st.session_state.circulation_path)
@@ -79,18 +80,16 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             
         st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px; {box_style}'>{display_name}</div>", unsafe_allow_html=True)
         
-        # Action Buttons side-by-side
-        c1, c2 = st.columns(2)
+        # Action Buttons clustered directly in the center using Spacer Columns!
+        pad_l, c1, c2, pad_r = st.columns([1, 2, 2, 1])
         with c1:
             if st.button("❌", key=f"rm_{seat_key}", use_container_width=True):
                 st.session_state.seats[seat_key] = "Empty"
-                # Remove from path if they delete the student
                 if current_val in st.session_state.circulation_path:
                     st.session_state.circulation_path.remove(current_val)
                 st.rerun()
         with c2:
             if st.button("👣", key=f"rt_{seat_key}", use_container_width=True):
-                # Prevent adding the same student to the path multiple times
                 if current_val not in st.session_state.circulation_path:
                     st.session_state.circulation_path.append(current_val)
                     st.rerun()
@@ -156,7 +155,6 @@ def render_seating_plan(df, cohort):
         path_str = " ➔ ".join([f"**{i+1}. {name}**" for i, name in enumerate(st.session_state.circulation_path)])
         st.info(path_str)
         
-        # Fixed the size argument bug here
         if st.button("Clear Route"):
             st.session_state.circulation_path = []
             st.rerun()
@@ -202,7 +200,6 @@ def render_seating_plan(df, cohort):
     st.markdown("---")
     st.subheader("🤖 ITT Mentor: Plan Evaluation")
     
-    # 1. Map the physical layout to a text format the AI can read
     layout_data = []
     if layout_choice == "Rows (4x8)":
         for r in range(4):
@@ -261,14 +258,12 @@ def render_seating_plan(df, cohort):
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
                 
-        # Let the trainee defend their choices
         teacher_reply = st.chat_input("Justify your plan to your mentor...")
         if teacher_reply:
             st.session_state.mentor_chat.append({"role": "user", "content": teacher_reply})
             with st.chat_message("user"):
                 st.write(teacher_reply)
             
-            # Send reply back to Gemini
             with st.spinner("Mentor is typing..."):
                 chat_history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.mentor_chat])
                 follow_up_prompt = (
