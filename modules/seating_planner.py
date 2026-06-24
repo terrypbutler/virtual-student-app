@@ -44,7 +44,8 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             </div>
         """, unsafe_allow_html=True)
         
-        if st.button("➕ Place", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
+        # UI Clean up: Just the plus emoji
+        if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
             if next_student:
                 st.session_state.seats[seat_key] = next_student
                 st.rerun()
@@ -56,17 +57,17 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
         st.markdown(f"<div style='text-align: center; font-size: 12px; margin: 2px 0; min-height: 18px;'>{dots if dots else ''}</div>", unsafe_allow_html=True)
         st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px;'>{current_val}</div>", unsafe_allow_html=True)
         
-        # Action Buttons side-by-side
+        # Action Buttons side-by-side (Text removed for a cleaner UI)
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("❌ Del", key=f"rm_{seat_key}", use_container_width=True):
+            if st.button("❌", key=f"rm_{seat_key}", use_container_width=True):
                 st.session_state.seats[seat_key] = "Empty"
                 # Remove from path if they delete the student
                 if current_val in st.session_state.circulation_path:
                     st.session_state.circulation_path.remove(current_val)
                 st.rerun()
         with c2:
-            if st.button("👣 Path", key=f"rt_{seat_key}", use_container_width=True):
+            if st.button("👣", key=f"rt_{seat_key}", use_container_width=True):
                 st.session_state.circulation_path.append(current_val)
                 st.rerun()
 
@@ -133,7 +134,7 @@ def render_seating_plan(df, cohort):
             st.session_state.circulation_path = []
             st.rerun()
     else:
-        st.caption("*Tip: Click the '👣 Path' button under a seated student to mark how you will circulate the room.*")
+        st.caption("*Tip: Click the '👣' button under a seated student to mark how you will circulate the room.*")
 
     # Front of Class Banner
     st.markdown("""
