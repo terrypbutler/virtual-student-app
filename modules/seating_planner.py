@@ -130,7 +130,7 @@ def render_seating_plan(df, cohort):
         st.markdown("**👣 Your Planned Circulation Route:**")
         path_str = " ➔ ".join([f"**{i+1}. {name}**" for i, name in enumerate(st.session_state.circulation_path)])
         st.info(path_str)
-        if st.button("Clear Route", size="small"):
+        if st.button("Clear Route"):
             st.session_state.circulation_path = []
             st.rerun()
     else:
