@@ -44,11 +44,13 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             </div>
         """, unsafe_allow_html=True)
         
-        # Borderless, floating Plus button
-        if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="tertiary", help="Place student here"):
-            if next_student:
-                st.session_state.seats[seat_key] = next_student
-                st.rerun()
+        # Centered Plus button
+        pad_l, btn, pad_r = st.columns([1, 4, 1])
+        with btn:
+            if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="tertiary", help="Place student here"):
+                if next_student:
+                    st.session_state.seats[seat_key] = next_student
+                    st.rerun()
     else:
         # NATIVE STREAMLIT RENDERING
         display_student_photo(current_val, cohort)
@@ -57,7 +59,7 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
         dot_html = f"<div style='display: flex; justify-content: center; width: 100%; font-size: 14px; margin: 2px 0; min-height: 20px; letter-spacing: 2px;'>{dots if dots else ''}</div>"
         st.markdown(dot_html, unsafe_allow_html=True)
         
-        # The Heat-Map Routing
+        # The Heat-Map Routing (Now controlled by the multiselect above)
         if current_val in st.session_state.circulation_path:
             idx = st.session_state.circulation_path.index(current_val)
             total = len(st.session_state.circulation_path)
@@ -77,19 +79,14 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             
         st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px; {box_style}'>{display_name}</div>", unsafe_allow_html=True)
         
-        # Action Buttons (type="tertiary" completely removes the box and border!)
-        c1, c2 = st.columns(2)
+        # Action Button: Now ONLY the Delete button, perfectly centered
+        pad_l, c1, pad_r = st.columns([1, 2, 1])
         with c1:
             if st.button("❌", key=f"rm_{seat_key}", use_container_width=True, type="tertiary", help="Remove student from seat"):
                 st.session_state.seats[seat_key] = "Empty"
                 if current_val in st.session_state.circulation_path:
                     st.session_state.circulation_path.remove(current_val)
                 st.rerun()
-        with c2:
-            if st.button("👣", key=f"rt_{seat_key}", use_container_width=True, type="tertiary", help="Add to circulation path"):
-                if current_val not in st.session_state.circulation_path:
-                    st.session_state.circulation_path.append(current_val)
-                    st.rerun()
 
 
 def render_seating_plan(df, cohort):
@@ -145,18 +142,20 @@ def render_seating_plan(df, cohort):
             st.session_state.mentor_chat = []
             st.rerun()
 
-    # The Circulation Path Display
+    # --- NEW: RAPID CIRCULATION ROUTE BUILDER ---
     st.markdown("---")
-    if st.session_state.circulation_path:
-        st.markdown("**👣 Your Planned Circulation Route:**")
-        path_str = " ➔ ".join([f"**{i+1}. {name}**" for i, name in enumerate(st.session_state.circulation_path)])
-        st.info(path_str)
+    if assigned_students:
+        # Clean up the path list just in case someone was deleted
+        safe_path = [name for name in st.session_state.circulation_path if name in assigned_students]
         
-        if st.button("Clear Route"):
-            st.session_state.circulation_path = []
-            st.rerun()
+        st.session_state.circulation_path = st.multiselect(
+            "👣 Build Circulation Route (Select students in the order you will visit them):",
+            options=assigned_students,
+            default=safe_path,
+            help="Click here to rapidly build your path without the page reloading on every click."
+        )
     else:
-        st.caption("*Tip: Click the '👣' button under a seated student to mark how you will circulate the room.*")
+        st.caption("*Seat some students to begin building a circulation route.*")
 
     # Front of Class Banner
     st.markdown("""
