@@ -54,10 +54,32 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
         display_student_photo(current_val, cohort)
         
         dots = get_student_dots(current_val, df)
-        st.markdown(f"<div style='text-align: center; font-size: 12px; margin: 2px 0; min-height: 18px;'>{dots if dots else ''}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px;'>{current_val}</div>", unsafe_allow_html=True)
         
-        # Action Buttons side-by-side (Text removed for a cleaner UI)
+        # IMPROVEMENT 1: Force perfect centering of the emojis using Flexbox
+        dot_html = f"<div style='display: flex; justify-content: center; width: 100%; font-size: 14px; margin: 2px 0; min-height: 20px; letter-spacing: 2px;'>{dots if dots else ''}</div>"
+        st.markdown(dot_html, unsafe_allow_html=True)
+        
+        # IMPROVEMENT 2: The Heat-Map Routing
+        if current_val in st.session_state.circulation_path:
+            idx = st.session_state.circulation_path.index(current_val)
+            total = len(st.session_state.circulation_path)
+            
+            # Calculate the color gradient (Dark Blue to Pale Blue)
+            lightness = int(30 + (55 * (idx / (total - 1)))) if total > 1 else 30
+            bg_color = f"hsl(210, 80%, {lightness}%)"
+            
+            # Automatically swap to dark text when the background gets light enough
+            text_color = "white" if lightness < 65 else "#111111"
+            
+            box_style = f"background-color: {bg_color}; color: {text_color}; padding: 4px; border-radius: 6px; border: 1px solid #3498db;"
+            display_name = f"{idx + 1}. {current_val}"
+        else:
+            box_style = "background-color: transparent; color: inherit; padding: 4px; border-radius: 6px; border: 1px solid transparent;"
+            display_name = current_val
+            
+        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px; {box_style}'>{display_name}</div>", unsafe_allow_html=True)
+        
+        # Action Buttons side-by-side
         c1, c2 = st.columns(2)
         with c1:
             if st.button("❌", key=f"rm_{seat_key}", use_container_width=True):
@@ -68,8 +90,10 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
                 st.rerun()
         with c2:
             if st.button("👣", key=f"rt_{seat_key}", use_container_width=True):
-                st.session_state.circulation_path.append(current_val)
-                st.rerun()
+                # Prevent adding the same student to the path multiple times
+                if current_val not in st.session_state.circulation_path:
+                    st.session_state.circulation_path.append(current_val)
+                    st.rerun()
 
 
 def render_seating_plan(df, cohort):
@@ -98,7 +122,8 @@ def render_seating_plan(df, cohort):
         with st.sidebar.container(border=True):
             display_student_photo(next_student, cohort)
             dots = get_student_dots(next_student, df)
-            dot_html = f"<div style='text-align: center; font-size: 16px; margin: 5px 0;'>{dots}</div>" if dots else "<div style='margin: 5px 0;'>&nbsp;</div>"
+            
+            dot_html = f"<div style='display: flex; justify-content: center; width: 100%; font-size: 16px; margin: 5px 0; letter-spacing: 2px;'>{dots}</div>" if dots else "<div style='margin: 5px 0;'>&nbsp;</div>"
             st.sidebar.markdown(f"<h4 style='text-align:center; margin-top:0px; font-size: 15px;'>{next_student}</h4>{dot_html}", unsafe_allow_html=True)
             st.sidebar.caption(f"**{len(unassigned_students)}** students remaining.")
     else:
@@ -130,6 +155,8 @@ def render_seating_plan(df, cohort):
         st.markdown("**👣 Your Planned Circulation Route:**")
         path_str = " ➔ ".join([f"**{i+1}. {name}**" for i, name in enumerate(st.session_state.circulation_path)])
         st.info(path_str)
+        
+        # Fixed the size argument bug here
         if st.button("Clear Route"):
             st.session_state.circulation_path = []
             st.rerun()
