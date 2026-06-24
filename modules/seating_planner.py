@@ -35,7 +35,7 @@ def get_student_dots(student_name, df):
 def render_seat_ui(seat_key, current_val, next_student, cohort, df):
     """Helper to consistently render the visual seat box without row jumping."""
     if current_val == "Empty":
-        # FIXED HEIGHT PLACEHOLDER: Prevents the rows from collapsing
+        # FIXED HEIGHT PLACEHOLDER
         st.markdown("""
             <div style='height: 190px; display: flex; align-items: center; justify-content: center; 
                         border: 2px dashed #ccc; border-radius: 8px; margin-bottom: 10px; 
@@ -44,19 +44,16 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             </div>
         """, unsafe_allow_html=True)
         
-        # UI Clean up: Centered the Plus button to match the populated seats
-        pad_l, btn, pad_r = st.columns([1, 4, 1])
-        with btn:
-            if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="secondary"):
-                if next_student:
-                    st.session_state.seats[seat_key] = next_student
-                    st.rerun()
+        # Borderless, floating Plus button
+        if st.button("➕", key=f"add_{seat_key}", use_container_width=True, type="tertiary", help="Place student here"):
+            if next_student:
+                st.session_state.seats[seat_key] = next_student
+                st.rerun()
     else:
         # NATIVE STREAMLIT RENDERING
         display_student_photo(current_val, cohort)
         
         dots = get_student_dots(current_val, df)
-        
         dot_html = f"<div style='display: flex; justify-content: center; width: 100%; font-size: 14px; margin: 2px 0; min-height: 20px; letter-spacing: 2px;'>{dots if dots else ''}</div>"
         st.markdown(dot_html, unsafe_allow_html=True)
         
@@ -80,16 +77,16 @@ def render_seat_ui(seat_key, current_val, next_student, cohort, df):
             
         st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 8px; {box_style}'>{display_name}</div>", unsafe_allow_html=True)
         
-        # Action Buttons clustered directly in the center using Spacer Columns!
-        pad_l, c1, c2, pad_r = st.columns([1, 2, 2, 1])
+        # Action Buttons (type="tertiary" completely removes the box and border!)
+        c1, c2 = st.columns(2)
         with c1:
-            if st.button("❌", key=f"rm_{seat_key}", use_container_width=True):
+            if st.button("❌", key=f"rm_{seat_key}", use_container_width=True, type="tertiary", help="Remove student from seat"):
                 st.session_state.seats[seat_key] = "Empty"
                 if current_val in st.session_state.circulation_path:
                     st.session_state.circulation_path.remove(current_val)
                 st.rerun()
         with c2:
-            if st.button("👣", key=f"rt_{seat_key}", use_container_width=True):
+            if st.button("👣", key=f"rt_{seat_key}", use_container_width=True, type="tertiary", help="Add to circulation path"):
                 if current_val not in st.session_state.circulation_path:
                     st.session_state.circulation_path.append(current_val)
                     st.rerun()
