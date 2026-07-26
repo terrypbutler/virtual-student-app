@@ -1,7 +1,8 @@
-streamlit
+streamlit>=1.51,<2
 pandas
-openpyxl
-requests
+altair
 Pillow
-opencv-python-headless
-matplotlib
+google-genai
+pypdf
+python-docx==1.1.0
+elevenlabs
